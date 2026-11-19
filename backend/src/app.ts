@@ -5,6 +5,7 @@ import { env } from './config/env.config';
 import { db, isFirebaseInitialized } from './config/firebase.config';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
+import leadRoutes from './routes/lead.routes';
 
 const app: Application = express();
 
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 // Đăng ký API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/leads', leadRoutes);
 
 // Endpoint kiểm tra sức khỏe hệ thống (Health Check)
 app.get('/api/health', async (_req: Request, res: Response) => {
