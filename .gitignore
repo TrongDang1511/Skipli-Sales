@@ -52,3 +52,7 @@ desktop.ini
 *.sublime-workspace
 
 /backend/src/scripts/*
+
+/postman
+/documents
+/test

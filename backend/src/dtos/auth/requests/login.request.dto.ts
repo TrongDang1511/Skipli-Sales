@@ -11,8 +11,8 @@ import { z } from 'zod';
 
 export const LoginRequestSchema = z.object({
   email: z
-    .string({ required_error: 'Vui lòng nhập email!' })
-    .email('Email không đúng định dạng (VD: trong@skipli.com)'),
+    .string({ required_error: 'Vui lòng nhập email hoặc tên đăng nhập!' })
+    .min(2, 'Email hoặc tên đăng nhập phải chứa ít nhất 2 ký tự!'),
   password: z
     .string({ required_error: 'Vui lòng nhập mật khẩu!' })
     .min(6, 'Mật khẩu phải chứa ít nhất 6 ký tự!'),

@@ -49,11 +49,15 @@ export class AuthService {
    * 1. ĐĂNG NHẬP & CẤP PHÁT DUAL-TOKEN (Access Token 15m + Refresh Token 7d)
    */
   async login(input: LoginRequestDto) {
-    const user = await this.userRepo.findByEmail(input.email);
+    const identifier = input.email.trim();
+    let user = await this.userRepo.findByEmail(identifier);
+    if (!user) {
+      user = await this.userRepo.findByUsername(identifier);
+    }
 
     // Dùng câu thông báo chung chống lộ danh tính (User Enumeration Defense)
     if (!user) {
-      throw new Error('Email hoặc mật khẩu không chính xác!');
+      throw new Error('Email/Tài khoản hoặc mật khẩu không chính xác!');
     }
 
     if (!user.isActive) {
