@@ -50,3 +50,9 @@ desktop.ini
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+/backend/src/scripts/*
+
+/postman
+/documents
+/test

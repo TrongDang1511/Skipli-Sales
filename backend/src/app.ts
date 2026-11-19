@@ -3,6 +3,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.config';
 import { db, isFirebaseInitialized } from './config/firebase.config';
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 
 const app: Application = express();
 
@@ -14,6 +16,10 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Đăng ký API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 // Endpoint kiểm tra sức khỏe hệ thống (Health Check)
 app.get('/api/health', async (_req: Request, res: Response) => {
