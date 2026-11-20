@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authApi, UserProfile } from '../services/auth.api';
 import { setAccessToken } from '../services/api';
 import { SkipliLogo } from '../components/common/SkipliLogo';
@@ -19,9 +19,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const hasInitializedRef = useRef<boolean>(false);
 
-  // Khởi động ứng dụng: Gọi ngầm Silent Refresh để khôi phục phiên từ Cookie HttpOnly
+  // Khởi động ứng dụng: Gọi ngầm Silent Refresh để khôi phục phiên từ Cookie HttpOnly (Singleton Guard)
   const initializeAuth = useCallback(async () => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
     try {
       const res = await authApi.refresh();
       if (res.data?.user) {

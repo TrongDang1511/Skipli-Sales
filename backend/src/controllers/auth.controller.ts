@@ -82,7 +82,9 @@ export class AuthController {
       const { accessToken, refreshToken, user } = await authService.refreshTokens(token);
 
       // Ghi đè Refresh Token mới vào Cookie (Xoay vòng Token - RTR)
-      res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
+      if (refreshToken) {
+        res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
+      }
 
       return res.status(200).json({
         success: true,
