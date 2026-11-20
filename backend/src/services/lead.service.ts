@@ -213,6 +213,16 @@ export class LeadService {
     const updates: Partial<Lead> = { ...dto };
     const today = new Date().toISOString().slice(0, 10);
 
+    // QUY TẮC BẢO VỆ: Chỉ cho phép xóa nextCallDate (set về null) khi chuyển sang WON hoặc LOST (hoặc lead đã ở WON/LOST)
+    if (dto.nextCallDate === null && dto.status !== 'WON' && dto.status !== 'LOST' && lead.status !== 'WON' && lead.status !== 'LOST') {
+      throw new Error('Chỉ được xóa Ngày hẹn gọi lại khi chốt hợp đồng (WON) hoặc ghi nhận thất bại (LOST)!');
+    }
+
+    // Nếu cập nhật ngày hẹn gọi lại mới -> Kiểm tra không được chọn ngày trong quá khứ
+    if (dto.nextCallDate && dto.nextCallDate < today) {
+      throw new Error(`Ngày hẹn gọi lại (${dto.nextCallDate}) không được nằm trong quá khứ!`);
+    }
+
     // QUY TẮC 1: Đổi sang nhóm bám đuổi (CALLING, LOW/HIGH INTERESTED, HOT_LEAD)
     // -> Bắt buộc có nextCallDate >= Today
     const followUpStatuses: LeadStatus[] = ['CALLING', 'LOW_INTERESTED', 'HIGH_INTERESTED', 'HOT_LEAD'];

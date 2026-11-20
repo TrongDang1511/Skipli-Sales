@@ -107,26 +107,27 @@ export class LeadRepository {
 
     let query: admin.firestore.Query = this.getDb().collection(this.collectionName);
 
-    // Lọc theo người phụ trách (RBAC: Sales chỉ lấy lead của mình)
+    // Lọc theo người phụ trách (RBAC: Sales chỉ lấy lead của mình - Single-Field Index chuẩn)
     if (assignedTo) {
       query = query.where('assignedTo', '==', assignedTo);
     }
 
-    // Lọc theo trạng thái phễu
-    if (status) {
-      query = query.where('status', '==', status);
-    }
-
-    // Lọc theo bang
-    if (state) {
-      query = query.where('state', '==', state.toUpperCase());
-    }
-
-    // Sắp xếp thời gian tạo mới nhất lên đầu
-    query = query.orderBy('createdAt', 'desc');
-
+    // LẤY DỮ LIỆU TỪ FIRESTORE (Chỉ dùng Single-Field Index để loại bỏ 100% lỗi FAILED_PRECONDITION đòi Composite Index)
     const snapshot = await query.get();
     let allLeads = snapshot.docs.map((doc) => doc.data() as Lead);
+
+    // Lọc theo trạng thái phễu trong bộ nhớ
+    if (status) {
+      allLeads = allLeads.filter((l) => l.status === status);
+    }
+
+    // Lọc theo bang trong bộ nhớ
+    if (state) {
+      allLeads = allLeads.filter((l) => l.state?.toUpperCase() === state.toUpperCase());
+    }
+
+    // Sắp xếp thời gian tạo mới nhất lên đầu trong bộ nhớ Node.js (<1ms)
+    allLeads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Tìm kiếm trong bộ nhớ (hỗ trợ tìm theo tên quán, hotline, tên chủ quán hoặc mã lead)
     if (search && search.trim() !== '') {
