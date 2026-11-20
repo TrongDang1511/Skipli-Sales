@@ -43,6 +43,7 @@ export const AdminLayout: React.FC = () => {
 
   const isOverviewActive = location.pathname === '/' || location.pathname === '/admin';
   const isUsersActive = location.pathname.startsWith('/users');
+  const isLeadsActive = location.pathname.startsWith('/leads');
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-slate-800 flex font-sans antialiased selection:bg-sky-200">
@@ -148,20 +149,30 @@ export const AdminLayout: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
               </button>
 
-              {/* Leads Nhà Hàng (Mở rộng trong tương lai) */}
+              {/* Leads Nhà Hàng (Route /leads) */}
               <button
                 type="button"
-                onClick={() => {
-                  toast.success('Phân hệ Quản Lý Khách Hàng / Leads Nhà Hàng đã sẵn sàng mở rộng module tiếp theo!');
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
+                onClick={() => navigate('/leads')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold transition-all ${
+                  isLeadsActive
+                    ? 'bg-[#071E3D] text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <Building2 className="w-4 h-4 text-slate-400" />
+                  <Building2
+                    className={`w-4 h-4 ${isLeadsActive ? 'text-sky-300' : 'text-slate-400'}`}
+                  />
                   <span>Leads Nhà Hàng</span>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                  86 mới
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    isLeadsActive
+                      ? 'bg-white/20 text-sky-200'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  }`}
+                >
+                  Leads CRM
                 </span>
               </button>
 
