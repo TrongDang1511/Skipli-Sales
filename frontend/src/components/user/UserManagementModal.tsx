@@ -117,7 +117,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                 Thêm Nhân Viên Sales Mới
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Thiết lập chuyên viên tiếp cận nhà hàng Mỹ và phân bổ tiền tố Leads cá nhân
+                Thiết lập chuyên viên tiếp cận nhà hàng và phân bổ tiền tố Leads cá nhân
               </p>
             </div>
           </div>

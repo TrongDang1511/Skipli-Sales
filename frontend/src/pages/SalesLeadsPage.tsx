@@ -24,9 +24,18 @@ import { leadApi } from '../services/lead.api';
 
 export const SalesLeadsPage: React.FC = () => {
   const { user } = useAuth();
-  const today = new Date().toISOString().slice(0, 10);
 
-  // Định dạng ngày hôm nay theo tiếng Việt chuẩn (VD: "Thứ Sáu, 20/11/2026")
+  // Helper lấy ngày định dạng YYYY-MM-DD theo giờ địa phương (đồng bộ chuẩn 100% với LeadDataTable)
+  const getLocalDateString = (d: Date = new Date()): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getLocalDateString();
+
+  // Định dạng ngày hôm nay theo tiếng Việt chuẩn (VD: "Thứ Hai, 23/11/2026")
   const rawFormatted = new Intl.DateTimeFormat('vi-VN', {
     weekday: 'long',
     day: '2-digit',
@@ -44,6 +53,8 @@ export const SalesLeadsPage: React.FC = () => {
     newLeads: 0,
     wonLeads: 0,
     followUpDue: 0,
+    followUpToday: 0,
+    followUpOverdue: 0,
     conversionRate: '0.0%',
   });
 
@@ -54,9 +65,27 @@ export const SalesLeadsPage: React.FC = () => {
       const total = res.total || 0;
       const newCount = items.filter((l) => l.status === 'NEW').length;
       const wonCount = items.filter((l) => l.status === 'WON').length;
-      const followUpCount = items.filter(
-        (l) => l.nextCallDate && l.nextCallDate.slice(0, 10) === today
+
+      // 1. Khách cần gọi HÔM NAY (chưa kết thúc deal)
+      const todayLeads = items.filter(
+        (l) =>
+          l.nextCallDate &&
+          l.nextCallDate.slice(0, 10) === today &&
+          l.status !== 'WON' &&
+          l.status !== 'LOST'
       ).length;
+
+      // 2. Khách QUÁ HẠN chưa gọi (chưa kết thúc deal)
+      const overdueLeads = items.filter(
+        (l) =>
+          l.nextCallDate &&
+          l.nextCallDate.slice(0, 10) < today &&
+          l.status !== 'WON' &&
+          l.status !== 'LOST'
+      ).length;
+
+      // 3. Tổng số khách cần xử lý bám đuổi (Hôm nay + Quá hạn)
+      const followUpCount = todayLeads + overdueLeads;
       const convRate = total > 0 ? ((wonCount / total) * 100).toFixed(1) + '%' : '0.0%';
 
       setStats({
@@ -64,6 +93,8 @@ export const SalesLeadsPage: React.FC = () => {
         newLeads: newCount,
         wonLeads: wonCount,
         followUpDue: followUpCount,
+        followUpToday: todayLeads,
+        followUpOverdue: overdueLeads,
         conversionRate: convRate,
       });
     } catch {
@@ -180,8 +211,22 @@ export const SalesLeadsPage: React.FC = () => {
               <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight text-amber-600">
                 {stats.followUpDue}
               </div>
-              <div className="text-[11px] text-amber-700 font-semibold">
-                Cần gọi lại hôm nay
+              <div className="text-[11px] text-amber-700 font-semibold flex items-center gap-1.5 flex-wrap">
+                {stats.followUpDue === 0 ? (
+                  <span>Đã hoàn thành gọi hôm nay</span>
+                ) : (
+                  <>
+                    <span>{stats.followUpToday} hôm nay</span>
+                    {stats.followUpOverdue > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="text-rose-600 font-bold">
+                          {stats.followUpOverdue} quá hạn
+                        </span>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             </div>
             <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-100 shadow-2xs shrink-0">
@@ -194,6 +239,7 @@ export const SalesLeadsPage: React.FC = () => {
         <LeadDataTable
           onOpenAddModal={() => setIsAddLeadModalOpen(true)}
           refreshTrigger={refreshTrigger}
+          onLeadUpdated={loadStats}
         />
       </main>
 

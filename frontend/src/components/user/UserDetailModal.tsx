@@ -318,7 +318,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Quyền Tiếp Cận:
                 </span>
-                <span className="font-bold text-slate-800">Leads Nhà Hàng Mỹ</span>
+                <span className="font-bold text-slate-800">Leads Nhà Hàng</span>
               </div>
             </div>
           </div>

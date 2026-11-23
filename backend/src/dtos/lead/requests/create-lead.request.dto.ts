@@ -16,7 +16,7 @@ export const CreateLeadRequestSchema = z.object({
     .min(2, 'Tên nhà hàng phải có ít nhất 2 ký tự!')
     .trim(),
   state: z
-    .string({ required_error: 'Vui lòng chọn bang tại Mỹ!' })
+    .string({ required_error: 'Vui lòng chọn bang!' })
     .length(2, 'Mã bang phải đúng 2 ký tự viết hoa (VD: VA, CA, TX)!')
     .transform((val) => val.toUpperCase().trim()),
   hotline: z

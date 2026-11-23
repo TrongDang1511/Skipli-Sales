@@ -47,11 +47,13 @@ import { LeadEditModal } from './LeadEditModal';
 interface LeadDataTableProps {
   onOpenAddModal?: () => void;
   refreshTrigger?: number;
+  onLeadUpdated?: () => void;
 }
 
 export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   onOpenAddModal,
   refreshTrigger = 0,
+  onLeadUpdated,
 }) => {
   const toast = useToast();
 
@@ -211,6 +213,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
       setLeads((prev) =>
         prev.map((item) => (item.id === lead.id ? { ...item, status: newStatus } : item))
       );
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Cập nhật trạng thái thất bại!'));
     }
@@ -234,6 +237,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             : item
         )
       );
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Cập nhật chốt hợp đồng thất bại!'));
       throw err;
@@ -256,6 +260,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             : item
         )
       );
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Ghi nhận thất bại lỗi!'));
       throw err;
@@ -274,6 +279,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
       toast.success(`Đã xóa thành công nhà hàng "${lead.restaurantName}"!`);
       setLeads((prev) => prev.filter((item) => item.id !== lead.id));
       setTotalLeads((prev) => Math.max(0, prev - 1));
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Xóa nhà hàng thất bại!'));
     }
@@ -301,6 +307,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
           ? `📅 Đã đặt lịch gọi lại cho "${lead.restaurantName}": ${dateStr}!`
           : `Đã xóa lịch hẹn cho quán "${lead.restaurantName}"!`
       );
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Cập nhật ngày hẹn gọi lại thất bại!'));
     }
@@ -334,6 +341,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
       } else {
         toast.info(`Đã cập nhật số lần gọi: ${newCount} lần cho "${lead.restaurantName}"`);
       }
+      onLeadUpdated?.();
     } catch (err: any) {
       toast.error(extractApiErrorMessage(err, 'Cập nhật số lần gọi thất bại!'));
     } finally {
@@ -383,7 +391,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
               }}
               className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer appearance-none"
             >
-              <option value="ALL">Toàn Bang (Mỹ)</option>
+              <option value="ALL">Toàn Bang</option>
               {US_STATES.map((st) => (
                 <option key={st.code} value={st.code}>
                   {st.code} - {st.name}
@@ -959,6 +967,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
         onClose={() => setEditModalLead(null)}
         onLeadUpdated={(updated) => {
           setLeads((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          onLeadUpdated?.();
         }}
       />
     </div>

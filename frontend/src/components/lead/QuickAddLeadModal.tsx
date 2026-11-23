@@ -306,7 +306,7 @@ export const QuickAddLeadModal: React.FC<QuickAddLeadModalProps> = ({
                 Thêm Nhà Hàng Tiềm Năng (Lead Mới)
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Khởi tạo dữ liệu khách hàng nhà hàng tại Mỹ, tự động cấp mã định danh cá nhân và chống trùng 20ms
+                Khởi tạo dữ liệu khách hàng nhà hàng, tự động cấp mã định danh cá nhân và chống trùng
               </p>
             </div>
           </div>
@@ -371,7 +371,7 @@ export const QuickAddLeadModal: React.FC<QuickAddLeadModalProps> = ({
                     {/* Bang */}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Bang Tại Mỹ <span className="text-rose-500">*</span>
+                        Bang <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
                         <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -682,7 +682,7 @@ export const QuickAddLeadModal: React.FC<QuickAddLeadModalProps> = ({
               {/* 2. Card Quy chuẩn hệ thống (Quick Tips) */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200/80 space-y-3">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Quy Chuẩn Nhập Lead Mỹ
+                  Quy Chuẩn Nhập Lead
                 </span>
 
                 <div className="space-y-2.5 text-xs text-slate-600">
@@ -760,7 +760,7 @@ export const QuickAddLeadModal: React.FC<QuickAddLeadModalProps> = ({
             ) : (
               <>
                 <PlusCircle className="w-4 h-4" />
-                <span>+ Lưu Nhà Hàng</span>
+                <span>Lưu Nhà Hàng</span>
                 <span className="text-[10px] font-normal opacity-80 border-l border-white/20 pl-1.5 hidden sm:inline">
                   Ctrl + ↵
                 </span>

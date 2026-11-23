@@ -200,7 +200,7 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Bang Tại Mỹ <span className="text-rose-500">*</span>
+                Bang <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
