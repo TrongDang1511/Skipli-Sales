@@ -33,12 +33,18 @@ import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import {
   Lead,
   LeadStatus,
+  LeadSheetKey,
+  LeadScheduleFilter,
+  LeadSheetCounts,
+  GetLeadsParams,
   LEAD_STATUS_CONFIG,
+  SCHEDULE_FILTER_OPTIONS,
   FOLLOW_UP_STATUSES,
   US_STATES,
   UpdateLeadInput,
 } from '../../types/lead.types';
 import { useToast } from '../../contexts/ToastContext';
+import { LeadSheetTabs } from './LeadSheetTabs';
 import { WonDealModal } from './WonDealModal';
 import { LostReasonModal } from './LostReasonModal';
 import { LeadDetailModal } from './LeadDetailModal';
@@ -81,11 +87,17 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  // State bộ lọc & tìm kiếm
+  // State bộ lọc, Sheet & tìm kiếm
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [activeSheet, setActiveSheet] = useState<LeadSheetKey>('NEW');
+  const [scheduleFilter, setScheduleFilter] = useState<LeadScheduleFilter>('ALL');
   const [stateFilter, setStateFilter] = useState<string>('ALL');
+  const [sheetCounts, setSheetCounts] = useState<LeadSheetCounts>({
+    NEW: 0,
+    FOLLOW_UP: 0,
+    CLOSED: 0,
+  });
 
   // State các popups phụ trợ
   const [wonModalLead, setWonModalLead] = useState<Lead | null>(null);
@@ -125,36 +137,41 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  // Lấy dữ liệu từ API
+  // Lấy dữ liệu từ API theo Sheet & bộ lọc hiện tại
   const fetchLeads = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: any = {
+      const params: GetLeadsParams = {
         page,
         limit,
+        sheet: activeSheet,
+        todayDate: today,
       };
 
       if (debouncedSearch) {
         params.search = debouncedSearch;
       }
-      if (statusFilter !== 'ALL') {
-        params.status = statusFilter as LeadStatus;
-      }
       if (stateFilter !== 'ALL') {
         params.state = stateFilter;
+      }
+      if (scheduleFilter !== 'ALL') {
+        params.schedule = scheduleFilter;
       }
 
       const res = await leadApi.getLeads(params);
       setLeads(res.items || []);
       setTotalLeads(res.total || 0);
       setTotalPages(res.totalPages || 1);
+      if (res.sheetCounts) {
+        setSheetCounts(res.sheetCounts);
+      }
     } catch (err: any) {
       console.error('Lỗi tải danh sách lead:', err);
       toast.error(extractApiErrorMessage(err, 'Lấy danh sách nhà hàng thất bại!'));
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, stateFilter]);
+  }, [page, limit, activeSheet, debouncedSearch, scheduleFilter, stateFilter, today]);
 
   // Kích hoạt fetch khi dependencies hoặc refreshTrigger thay đổi
   useEffect(() => {
@@ -401,24 +418,26 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          {/* Lọc Trạng Thái (Dropdown Status phong cách hình mẫu) */}
+          {/* Lọc Lịch Gọi (Thay thế bộ lọc Status khi đã chia 3 Sheet) */}
           <div className="relative">
             <select
-              value={statusFilter}
+              value={scheduleFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value);
+                setScheduleFilter(e.target.value as LeadScheduleFilter);
                 setPage(1);
               }}
               className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer appearance-none"
             >
-              <option value="ALL" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Status: All</option>
-              <option value="NEW" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>New</option>
-              <option value="CALLING" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Calling</option>
-              <option value="LOW_INTERESTED" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Low Interest</option>
-              <option value="HIGH_INTERESTED" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>High Interest</option>
-              <option value="HOT_LEAD" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Hot</option>
-              <option value="WON" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Won</option>
-              <option value="LOST" className="bg-white text-slate-800" style={{ backgroundColor: '#ffffff', color: '#1e293b' }}>Lost</option>
+              {SCHEDULE_FILTER_OPTIONS.map((opt) => (
+                <option
+                  key={opt.value}
+                  value={opt.value}
+                  className="bg-white text-slate-800"
+                  style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
+                >
+                  {opt.label}
+                </option>
+              ))}
             </select>
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -455,6 +474,16 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
       {/* BẢNG DỮ LIỆU CHÍNH (LEAD DATA TABLE)                                */}
       {/* =================================================================== */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs">
+        {/* Thanh chuyển 3 Sheet kiểu Google Sheet (New / Follow-Up / Closed) */}
+        <LeadSheetTabs
+          activeSheet={activeSheet}
+          counts={sheetCounts}
+          onChangeSheet={(nextSheet) => {
+            setActiveSheet(nextSheet);
+            setPage(1);
+          }}
+        />
+
         <div className="overflow-x-auto min-h-[380px]">
           <table className="w-full text-left border-collapse">
             <thead>

@@ -10,6 +10,28 @@
 import * as admin from 'firebase-admin';
 import { db, isFirebaseInitialized } from '../config/firebase.config';
 import { Lead, LeadStatus } from '../models/lead.model';
+import { LeadSheetKey, LeadScheduleFilter, LEAD_SHEET_STATUSES } from '../dtos';
+
+export type LeadSheetCounts = Record<LeadSheetKey, number>;
+
+// Helper nội bộ kiểm tra điều kiện Lịch gọi tiếp theo
+function matchesScheduleFilter(
+  nextCallDate: string | null | undefined,
+  schedule: LeadScheduleFilter,
+  today: string
+): boolean {
+  const datePart = nextCallDate ? nextCallDate.slice(0, 10) : '';
+  switch (schedule) {
+    case 'TODAY':
+      return datePart === today;
+    case 'OVERDUE':
+      return Boolean(datePart) && datePart < today;
+    case 'UPCOMING':
+      return Boolean(datePart) && datePart > today;
+    case 'UNSCHEDULED':
+      return !datePart;
+  }
+}
 
 export class LeadRepository {
   private collectionName = 'leads';
@@ -93,17 +115,30 @@ export class LeadRepository {
   }
 
   /**
-   * 5. TRUY VẤN DANH SÁCH LEADS CÓ LỌC, TÌM KIẾM VÀ PHÂN TRANG
+   * 5. TRUY VẤN DANH SÁCH LEADS CÓ LỌC, TÌM KIẾM, CHIA SHEET VÀ PHÂN TRANG
    */
   async findLeads(options: {
     assignedTo?: string;
     status?: LeadStatus;
+    sheet?: LeadSheetKey;
+    schedule?: LeadScheduleFilter;
+    todayDate?: string;
     state?: string;
     search?: string;
     page?: number;
     limit?: number;
-  }): Promise<{ items: Lead[]; total: number }> {
-    const { assignedTo, status, state, search, page = 1, limit = 25 } = options;
+  }): Promise<{ items: Lead[]; total: number; sheetCounts: LeadSheetCounts }> {
+    const {
+      assignedTo,
+      status,
+      sheet,
+      schedule,
+      todayDate,
+      state,
+      search,
+      page = 1,
+      limit = 25,
+    } = options;
 
     let query: admin.firestore.Query = this.getDb().collection(this.collectionName);
 
@@ -124,18 +159,10 @@ export class LeadRepository {
       );
     }
 
-    // Lọc theo trạng thái phễu trong bộ nhớ
-    if (status) {
-      allLeads = allLeads.filter((l) => l.status === status);
-    }
-
     // Lọc theo bang trong bộ nhớ
     if (state) {
       allLeads = allLeads.filter((l) => l.state?.toUpperCase() === state.toUpperCase());
     }
-
-    // Sắp xếp thời gian tạo mới nhất lên đầu trong bộ nhớ Node.js (<1ms)
-    allLeads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Tìm kiếm trong bộ nhớ (hỗ trợ tìm theo tên quán, hotline, tên chủ quán hoặc mã lead)
     if (search && search.trim() !== '') {
@@ -149,6 +176,40 @@ export class LeadRepository {
       );
     }
 
+    // Lọc theo Lịch gọi tiếp theo trong bộ nhớ
+    if (schedule) {
+      const today = todayDate || new Date().toISOString().slice(0, 10);
+      allLeads = allLeads.filter((l) => matchesScheduleFilter(l.nextCallDate, schedule, today));
+    }
+
+    // Đếm số lượng cho cả 3 Sheet TRƯỚC khi cắt theo sheet đang chọn
+    const sheetCounts: LeadSheetCounts = { NEW: 0, FOLLOW_UP: 0, CLOSED: 0 };
+    for (const lead of allLeads) {
+      if (LEAD_SHEET_STATUSES.NEW.includes(lead.status)) sheetCounts.NEW += 1;
+      else if (LEAD_SHEET_STATUSES.FOLLOW_UP.includes(lead.status)) sheetCounts.FOLLOW_UP += 1;
+      else if (LEAD_SHEET_STATUSES.CLOSED.includes(lead.status)) sheetCounts.CLOSED += 1;
+    }
+
+    // Lọc theo Sheet (hoặc status đơn lẻ cho Admin)
+    if (sheet) {
+      const allowedStatuses = LEAD_SHEET_STATUSES[sheet];
+      allLeads = allLeads.filter((l) => allowedStatuses.includes(l.status));
+    } else if (status) {
+      allLeads = allLeads.filter((l) => l.status === status);
+    }
+
+    // Sắp xếp thứ tự trong bộ nhớ Node.js (<1ms):
+    // - Sheet Follow-Up / Closed: ưu tiên lead vừa chuyển status gần nhất lên đầu
+    // - Sheet New / Mặc định: ưu tiên lead mới tạo lên đầu
+    const getSortTime = (lead: Lead): number => {
+      const timestamp =
+        sheet === 'FOLLOW_UP' || sheet === 'CLOSED'
+          ? lead.statusUpdatedAt || lead.updatedAt || lead.createdAt
+          : lead.createdAt;
+      return new Date(timestamp).getTime();
+    };
+    allLeads.sort((a, b) => getSortTime(b) - getSortTime(a));
+
     const total = allLeads.length;
     const startIndex = (page - 1) * limit;
     const paginatedItems = allLeads.slice(startIndex, startIndex + limit);
@@ -156,6 +217,7 @@ export class LeadRepository {
     return {
       items: paginatedItems,
       total,
+      sheetCounts,
     };
   }
 

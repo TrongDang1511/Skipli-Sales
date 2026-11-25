@@ -45,4 +45,5 @@ export interface Lead {
   aiEvaluation?: string;           // Nhận xét, đánh giá sơ bộ của AI về tiềm năng quán
   createdAt: string;               // Thời gian tạo bản ghi (ISO 8601 String)
   updatedAt: string;               // Thời gian cập nhật bản ghi gần nhất (ISO 8601 String)
+  statusUpdatedAt?: string;        // Thời điểm chuyển trạng thái phễu gần nhất (ISO 8601 String)
 }

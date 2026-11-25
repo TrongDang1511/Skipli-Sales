@@ -8,9 +8,14 @@
  */
 
 import crypto from 'crypto';
-import { LeadRepository } from '../repositories/lead.repository';
+import { LeadRepository, LeadSheetCounts } from '../repositories/lead.repository';
 import { UserRepository } from '../repositories/user.repository';
-import { CreateLeadRequestDto, GetLeadsQueryDto, UpdateLeadRequestDto } from '../dtos';
+import {
+  CreateLeadRequestDto,
+  GetLeadsQueryDto,
+  UpdateLeadRequestDto,
+  LEAD_SHEET_STATUSES,
+} from '../dtos';
 import { Lead, LeadStatus } from '../models/lead.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
@@ -109,7 +114,9 @@ export class LeadService {
       }
     }
 
-    // 4. Sinh mã định danh cá nhân tăng tịnh tiến (Atomic Transaction)
+    // 4. Sinh mã định danh theo tiền tố của người tạo (kể cả khi hệ thống có nhiều Admin)
+    // Nếu Admin tạo -> mặc định chưa phân công để Admin tự bàn giao sau
+    const isAdminCreator = currentUser.role === 'ADMIN';
     const prefix = currentUser.salesPrefix || 'LD';
     const sequence = await this.leadRepo.getNextLeadSequence(prefix);
     const leadCustomId = `${prefix}-${sequence}`;
@@ -131,9 +138,9 @@ export class LeadService {
       googleMapsUrl: dto.googleMapsUrl || '',
       facebookUrl: dto.facebookUrl || '',
       status: 'NEW', // Mặc định khi mới tạo là NEW
-      assignedTo: currentUser.id,
-      assignedPrefix: prefix,
-      assignedName: currentUser.fullName,
+      assignedTo: isAdminCreator ? '' : currentUser.id,
+      assignedPrefix: isAdminCreator ? '' : prefix,
+      assignedName: isAdminCreator ? 'Chưa phân công' : currentUser.fullName,
       latestNote: dto.saleNote || '',
       callCount: 0,
       lastCallDate: null,
@@ -142,13 +149,14 @@ export class LeadService {
       aiEvaluation: dto.aiEvaluation || '',
       createdAt: now,
       updatedAt: now,
+      statusUpdatedAt: now,
     };
 
     return await this.leadRepo.create(newLead);
   }
 
   /**
-   * 3. LẤY DANH SÁCH LEADS (ÁP DỤNG RBAC BẢO MẬT PHÂN QUYỀN)
+   * 3. LẤY DANH SÁCH LEADS (ÁP DỤNG RBAC BẢO MẬT PHÂN QUYỀN & CHIA SHEET)
    */
   async getLeads(
     query: GetLeadsQueryDto,
@@ -159,16 +167,17 @@ export class LeadService {
     page: number;
     pageSize: number;
     totalPages: number;
+    sheetCounts: LeadSheetCounts;
   }> {
     // Nguyên tắc RBAC: Nếu là SALES -> bắt buộc chỉ lấy lead do mình phụ trách!
-    let assignedToFilter = query.assignedTo;
-    if (currentUser.role === 'SALES') {
-      assignedToFilter = currentUser.id;
-    }
+    const assignedToFilter = currentUser.role === 'SALES' ? currentUser.id : query.assignedTo;
 
-    const { items, total } = await this.leadRepo.findLeads({
+    const { items, total, sheetCounts } = await this.leadRepo.findLeads({
       assignedTo: assignedToFilter,
       status: query.status,
+      sheet: query.sheet,
+      schedule: query.schedule,
+      todayDate: query.todayDate,
       state: query.state,
       search: query.search,
       page: query.page,
@@ -183,6 +192,7 @@ export class LeadService {
       page: query.page,
       pageSize: query.limit,
       totalPages,
+      sheetCounts,
     };
   }
 
@@ -228,8 +238,7 @@ export class LeadService {
 
     // QUY TẮC 1: Đổi sang nhóm bám đuổi (CALLING, LOW/HIGH INTERESTED, HOT_LEAD)
     // -> Bắt buộc có nextCallDate >= Today
-    const followUpStatuses: LeadStatus[] = ['CALLING', 'LOW_INTERESTED', 'HIGH_INTERESTED', 'HOT_LEAD'];
-    if (dto.status && followUpStatuses.includes(dto.status)) {
+    if (dto.status && LEAD_SHEET_STATUSES.FOLLOW_UP.includes(dto.status)) {
       const activeNextCall = dto.nextCallDate !== undefined ? dto.nextCallDate : lead.nextCallDate;
 
       if (!activeNextCall || activeNextCall.trim() === '') {
@@ -286,6 +295,11 @@ export class LeadService {
       }
     }
 
+    // Ghi nhận mốc thời gian chuyển status để xếp các lead mới chuyển lên đầu Sheet (Follow-Up / Closed)
+    if (dto.status && dto.status !== lead.status) {
+      updates.statusUpdatedAt = new Date().toISOString();
+    }
+
     const updated = await this.leadRepo.update(id, updates);
     if (!updated) {
       throw new Error('Cập nhật thông tin nhà hàng thất bại!');
@@ -303,6 +317,41 @@ export class LeadService {
   }
 
   /**
+   * Helper nội bộ chuẩn hóa dữ liệu bàn giao / thu hồi lead (dùng chung cho assignLead & bulkAssignLeads)
+   */
+  private async resolveAssignmentUpdates(
+    targetSalesId: string,
+    currentUser: NonNullable<AuthRequest['user']>,
+    forbiddenMessage: string
+  ): Promise<Partial<Lead>> {
+    if (currentUser.role !== 'ADMIN') {
+      throw new Error(forbiddenMessage);
+    }
+
+    const now = new Date().toISOString();
+    if (targetSalesId === 'UNASSIGNED') {
+      return {
+        assignedTo: '',
+        assignedPrefix: '',
+        assignedName: 'Chưa phân công',
+        updatedAt: now,
+      };
+    }
+
+    const targetUser = await this.userRepo.findById(targetSalesId);
+    if (!targetUser || !targetUser.isActive) {
+      throw new Error('Nhân viên Sales tiếp nhận không tồn tại hoặc tài khoản đang bị khóa!');
+    }
+
+    return {
+      assignedTo: targetUser.id,
+      assignedPrefix: targetUser.salesPrefix || 'SR',
+      assignedName: targetUser.fullName,
+      updatedAt: now,
+    };
+  }
+
+  /**
    * 7. ADMIN BÀN GIAO 1 LEAD CHO SALES VIÊN HOẶC THU HỒI VỀ KHO CHUNG
    */
   async assignLead(
@@ -310,40 +359,15 @@ export class LeadService {
     targetSalesId: string,
     currentUser: NonNullable<AuthRequest['user']>
   ): Promise<Lead> {
-    // Ràng buộc RBAC: Chỉ Quản trị viên mới có quyền điều chuyển lead
-    if (currentUser.role !== 'ADMIN') {
-      throw new Error('Chỉ Quản trị viên (Admin) mới có quyền phân bổ hoặc điều chuyển lead!');
-    }
+    const updates = await this.resolveAssignmentUpdates(
+      targetSalesId,
+      currentUser,
+      'Chỉ Quản trị viên (Admin) mới có quyền phân bổ hoặc điều chuyển lead!'
+    );
 
     const lead = await this.leadRepo.findById(leadId);
     if (!lead) {
       throw new Error('Không tìm thấy nhà hàng yêu cầu bàn giao!');
-    }
-
-    const now = new Date().toISOString();
-    let updates: Partial<Lead> = {};
-
-    // Trường hợp 1: Thu hồi lead về kho chung (Chưa phân công)
-    if (targetSalesId === 'UNASSIGNED') {
-      updates = {
-        assignedTo: '',
-        assignedPrefix: '',
-        assignedName: 'Chưa phân công',
-        updatedAt: now,
-      };
-    } else {
-      // Trường hợp 2: Bàn giao cho nhân viên Sales cụ thể
-      const targetUser = await this.userRepo.findById(targetSalesId);
-      if (!targetUser || !targetUser.isActive) {
-        throw new Error('Nhân viên Sales tiếp nhận không tồn tại hoặc tài khoản đang bị khóa!');
-      }
-
-      updates = {
-        assignedTo: targetUser.id,
-        assignedPrefix: targetUser.salesPrefix || 'SR',
-        assignedName: targetUser.fullName,
-        updatedAt: now,
-      };
     }
 
     const updated = await this.leadRepo.update(leadId, updates);
@@ -362,36 +386,12 @@ export class LeadService {
     targetSalesId: string,
     currentUser: NonNullable<AuthRequest['user']>
   ): Promise<{ updatedCount: number }> {
-    // Ràng buộc RBAC: Chỉ Quản trị viên mới có quyền phân bổ hàng loạt
-    if (currentUser.role !== 'ADMIN') {
-      throw new Error('Chỉ Quản trị viên (Admin) mới có quyền phân bổ lead hàng loạt!');
-    }
+    const updates = await this.resolveAssignmentUpdates(
+      targetSalesId,
+      currentUser,
+      'Chỉ Quản trị viên (Admin) mới có quyền phân bổ lead hàng loạt!'
+    );
 
-    const now = new Date().toISOString();
-    let updates: Partial<Lead> = {};
-
-    if (targetSalesId === 'UNASSIGNED') {
-      updates = {
-        assignedTo: '',
-        assignedPrefix: '',
-        assignedName: 'Chưa phân công',
-        updatedAt: now,
-      };
-    } else {
-      const targetUser = await this.userRepo.findById(targetSalesId);
-      if (!targetUser || !targetUser.isActive) {
-        throw new Error('Nhân viên Sales tiếp nhận không tồn tại hoặc tài khoản đang bị khóa!');
-      }
-
-      updates = {
-        assignedTo: targetUser.id,
-        assignedPrefix: targetUser.salesPrefix || 'SR',
-        assignedName: targetUser.fullName,
-        updatedAt: now,
-      };
-    }
-
-    // Thực thi Batch Write thông qua Repository
     const updatedCount = await this.leadRepo.bulkUpdate(leadIds, updates);
     return { updatedCount };
   }
