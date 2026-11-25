@@ -12,6 +12,9 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
+// Singleton Promise Lock: Đảm bảo chỉ có DUY NHẤT 1 request refresh bay đi cùng lúc trên toàn client
+let activeRefreshPromise: Promise<any> | null = null;
+
 export const authApi = {
   // 1. Đăng nhập hệ thống (POST /api/auth/login)
   login: async (credentials: { email: string; password: string }) => {
@@ -25,12 +28,24 @@ export const authApi = {
 
   // 2. Làm mới phiên đăng nhập (POST /api/auth/refresh)
   refresh: async () => {
-    const res = await api.post('/auth/refresh');
-    const token = res.data.data?.accessToken;
-    if (token) {
-      setAccessToken(token);
+    if (activeRefreshPromise) {
+      return activeRefreshPromise;
     }
-    return res.data;
+
+    activeRefreshPromise = (async () => {
+      try {
+        const res = await api.post('/auth/refresh');
+        const token = res.data.data?.accessToken;
+        if (token) {
+          setAccessToken(token);
+        }
+        return res.data;
+      } finally {
+        activeRefreshPromise = null;
+      }
+    })();
+
+    return activeRefreshPromise;
   },
 
   // 3. Lấy thông tin user hiện tại (GET /api/auth/me)

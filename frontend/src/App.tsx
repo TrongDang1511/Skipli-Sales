@@ -6,8 +6,11 @@ import { ActivateAccountPage } from './pages/ActivateAccountPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { SalesWorkspacePage } from './pages/SalesWorkspacePage';
+import { SalesLeadsPage } from './pages/SalesLeadsPage';
+import { AdminLeadsPage } from './pages/AdminLeadsPage';
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/guards/RouteGuards';
 import { AdminLayout } from './components/layout/AdminLayout';
+import { SalesLayout } from './components/layout/SalesLayout';
 
 export default function App() {
   return (
@@ -42,17 +45,26 @@ export default function App() {
 
               {/* Trang Quản Trị Nhân Viên Riêng Biệt (Route /users) */}
               <Route path="users" element={<UserManagementPage />} />
+
+              {/* Trang Quản Trị & Phân Bổ Leads Toàn Hệ Thống (Route /leads) */}
+              <Route path="leads" element={<AdminLeadsPage />} />
             </Route>
 
-            {/* Tuyến Đường Bàn Làm Việc Sales: Dành cho nhân viên chốt deal */}
+            {/* Tuyến Đường Bàn Làm Việc Sales: Phân Hệ Chuyên Viên Tiếp Cận & Chốt Deal */}
             <Route
               path="/workspace"
               element={
                 <ProtectedRoute>
-                  <SalesWorkspacePage />
+                  <SalesLayout />
                 </ProtectedRoute>
               }
-            />
+            >
+              {/* Trang Dashboard Tổng Quan Hiệu Suất Cá Nhân (Route /workspace) */}
+              <Route index element={<SalesWorkspacePage />} />
+
+              {/* Trang Quản Lý Leads Khách Hàng Tiềm Năng (Route /workspace/leads) */}
+              <Route path="leads" element={<SalesLeadsPage />} />
+            </Route>
 
             {/* Điều hướng mặc định nếu gõ sai đường dẫn */}
             <Route path="*" element={<Navigate to="/" replace />} />

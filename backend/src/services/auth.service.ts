@@ -91,6 +91,8 @@ export class AuthService {
 
     // Băm Refresh Token với bcrypt và lưu vào CSDL để đối soát
     user.refreshTokenHash = await bcrypt.hash(refreshToken, 8);
+    user.previousRefreshTokenHash = null;
+    user.previousRefreshTokenExpiresAt = null;
     user.updatedAt = new Date().toISOString();
     await this.userRepo.save(user);
 
@@ -125,46 +127,85 @@ export class AuthService {
       throw new Error('Phiên làm việc đã bị thu hồi từ trước. Vui lòng đăng nhập lại!');
     }
 
-    // So khớp Refresh Token gửi lên với hash lưu trong CSDL
+    // 1. So khớp Refresh Token gửi lên với hash lưu trong CSDL
     const isTokenMatch = await bcrypt.compare(refreshToken, user.refreshTokenHash);
 
-    // PHÁT HIỆN TẤN CÔNG DÙNG LẠI TOKEN ĐÃ XOAY VÒNG (Token Reuse Detection)
-    if (!isTokenMatch) {
-      user.refreshTokenHash = null;
+    if (isTokenMatch) {
+      // CƠ CHẾ XOAY VÒNG (ROTATION): Cấp cặp token hoàn toàn mới
+      const newAccessToken = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          fullName: user.fullName,
+          salesPrefix: user.salesPrefix,
+        },
+        env.jwtAccessSecret,
+        { expiresIn: '15m' }
+      );
+
+      const newRefreshToken = jwt.sign(
+        { id: user.id },
+        env.jwtRefreshSecret,
+        { expiresIn: '7d' }
+      );
+
+      // CƠ CHẾ GRACE PERIOD (Ân hạn 20s theo chuẩn Auth0 / RFC 6819):
+      // Lưu lại hash của token cũ vừa đổi phòng trường hợp React StrictMode hoặc mạng lag retry
+      user.previousRefreshTokenHash = user.refreshTokenHash;
+      user.previousRefreshTokenExpiresAt = new Date(Date.now() + 20 * 1000).toISOString();
+
+      // Cập nhật hash của Refresh Token mới vào Firestore
+      user.refreshTokenHash = await bcrypt.hash(newRefreshToken, 8);
       user.updatedAt = new Date().toISOString();
       await this.userRepo.save(user);
-      throw new Error('Cảnh báo bảo mật: Refresh token không hợp lệ hoặc đã qua sử dụng! Phiên đã bị khóa.');
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: this.sanitizeUser(user),
+      };
     }
 
-    // CƠ CHẾ XOAY VÒNG (ROTATION): Cấp cặp token hoàn toàn mới
-    const newAccessToken = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        fullName: user.fullName,
-        salesPrefix: user.salesPrefix,
-      },
-      env.jwtAccessSecret,
-      { expiresIn: '15m' }
-    );
+    // 2. Nếu không khớp token chính thức -> Kiểm tra xem có nằm trong Grace Period hợp lệ (20s) hay không!
+    const now = Date.now();
+    const isWithinGracePeriod =
+      user.previousRefreshTokenHash &&
+      user.previousRefreshTokenExpiresAt &&
+      new Date(user.previousRefreshTokenExpiresAt).getTime() > now;
 
-    const newRefreshToken = jwt.sign(
-      { id: user.id },
-      env.jwtRefreshSecret,
-      { expiresIn: '7d' }
-    );
+    if (isWithinGracePeriod && user.previousRefreshTokenHash) {
+      const isGraceMatch = await bcrypt.compare(refreshToken, user.previousRefreshTokenHash);
+      if (isGraceMatch) {
+        // ĐÂY LÀ REQUEST ĐỒNG THỜI HỢP LỆ (Mạng lag retry / React StrictMode / Multi-Tab trong 20s)!
+        // Cấp Access Token mới mà KHÔNG thu hồi phiên, bảo toàn quyền truy cập cho user
+        const newAccessToken = jwt.sign(
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            fullName: user.fullName,
+            salesPrefix: user.salesPrefix,
+          },
+          env.jwtAccessSecret,
+          { expiresIn: '15m' }
+        );
 
-    // Cập nhật hash của Refresh Token mới vào Firestore
-    user.refreshTokenHash = await bcrypt.hash(newRefreshToken, 8);
+        return {
+          accessToken: newAccessToken,
+          refreshToken: null, // Không ghi đè lại refreshToken mới để tránh xáo trộn cookie
+          user: this.sanitizeUser(user),
+        };
+      }
+    }
+
+    // 3. Nếu không khớp cả token hiện tại lẫn Grace Period -> ĐÍCH THỰC LÀ TOKEN REUSE ATTACK!
+    user.refreshTokenHash = null;
+    user.previousRefreshTokenHash = null;
+    user.previousRefreshTokenExpiresAt = null;
     user.updatedAt = new Date().toISOString();
     await this.userRepo.save(user);
-
-    return {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      user: this.sanitizeUser(user),
-    };
+    throw new Error('Cảnh báo bảo mật: Refresh token không hợp lệ hoặc đã qua sử dụng! Phiên đã bị khóa.');
   }
 
   /**
@@ -174,6 +215,8 @@ export class AuthService {
     const user = await this.userRepo.findById(userId);
     if (user) {
       user.refreshTokenHash = null;
+      user.previousRefreshTokenHash = null;
+      user.previousRefreshTokenExpiresAt = null;
       user.updatedAt = new Date().toISOString();
       await this.userRepo.save(user);
     }

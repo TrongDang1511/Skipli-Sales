@@ -13,7 +13,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { env } from '../config/env.config';
 
 const authService = new AuthService();
-const REFRESH_COOKIE_NAME = 'refreshToken';
+const REFRESH_COOKIE_NAME = 'skipli_refresh_token';
 
 /**
  * Cấu hình Cookie an toàn thích ứng động theo môi trường (Dev vs Production)
@@ -82,7 +82,9 @@ export class AuthController {
       const { accessToken, refreshToken, user } = await authService.refreshTokens(token);
 
       // Ghi đè Refresh Token mới vào Cookie (Xoay vòng Token - RTR)
-      res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
+      if (refreshToken) {
+        res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
+      }
 
       return res.status(200).json({
         success: true,
