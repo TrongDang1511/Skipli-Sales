@@ -114,7 +114,9 @@ export class LeadService {
       }
     }
 
-    // 4. Sinh mã định danh cá nhân tăng tịnh tiến (Atomic Transaction)
+    // 4. Sinh mã định danh theo tiền tố của người tạo (kể cả khi hệ thống có nhiều Admin)
+    // Nếu Admin tạo -> mặc định chưa phân công để Admin tự bàn giao sau
+    const isAdminCreator = currentUser.role === 'ADMIN';
     const prefix = currentUser.salesPrefix || 'LD';
     const sequence = await this.leadRepo.getNextLeadSequence(prefix);
     const leadCustomId = `${prefix}-${sequence}`;
@@ -136,9 +138,9 @@ export class LeadService {
       googleMapsUrl: dto.googleMapsUrl || '',
       facebookUrl: dto.facebookUrl || '',
       status: 'NEW', // Mặc định khi mới tạo là NEW
-      assignedTo: currentUser.id,
-      assignedPrefix: prefix,
-      assignedName: currentUser.fullName,
+      assignedTo: isAdminCreator ? '' : currentUser.id,
+      assignedPrefix: isAdminCreator ? '' : prefix,
+      assignedName: isAdminCreator ? 'Chưa phân công' : currentUser.fullName,
       latestNote: dto.saleNote || '',
       callCount: 0,
       lastCallDate: null,
