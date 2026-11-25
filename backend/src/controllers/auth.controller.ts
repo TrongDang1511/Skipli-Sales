@@ -13,7 +13,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { env } from '../config/env.config';
 
 const authService = new AuthService();
-const REFRESH_COOKIE_NAME = 'refreshToken';
+const REFRESH_COOKIE_NAME = 'skipli_refresh_token';
 
 /**
  * Cấu hình Cookie an toàn thích ứng động theo môi trường (Dev vs Production)
