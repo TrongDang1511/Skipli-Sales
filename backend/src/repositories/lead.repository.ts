@@ -108,13 +108,21 @@ export class LeadRepository {
     let query: admin.firestore.Query = this.getDb().collection(this.collectionName);
 
     // Lọc theo người phụ trách (RBAC: Sales chỉ lấy lead của mình - Single-Field Index chuẩn)
-    if (assignedTo) {
+    // Nếu Admin lọc 'UNASSIGNED' thì bỏ qua filter Firestore để lọc in-memory các lead trống
+    if (assignedTo && assignedTo !== 'UNASSIGNED') {
       query = query.where('assignedTo', '==', assignedTo);
     }
 
     // LẤY DỮ LIỆU TỪ FIRESTORE (Chỉ dùng Single-Field Index để loại bỏ 100% lỗi FAILED_PRECONDITION đòi Composite Index)
     const snapshot = await query.get();
     let allLeads = snapshot.docs.map((doc) => doc.data() as Lead);
+
+    // Lọc theo quán chưa phân công (nếu Admin chọn xem quán chưa gán người phụ trách)
+    if (assignedTo === 'UNASSIGNED') {
+      allLeads = allLeads.filter(
+        (l) => !l.assignedTo || l.assignedTo.trim() === '' || l.assignedTo === 'UNASSIGNED'
+      );
+    }
 
     // Lọc theo trạng thái phễu trong bộ nhớ
     if (status) {
@@ -178,5 +186,23 @@ export class LeadRepository {
 
     await docRef.delete();
     return true;
+  }
+
+  /**
+   * 8. CẬP NHẬT ĐỒNG LOẠT NHIỀU LEADS DÙNG FIRESTORE BATCH WRITE (<100MS)
+   * Giúp Admin bàn giao 10-50 quán cùng một lúc trong 1 Network Round-trip duy nhất
+   */
+  async bulkUpdate(leadIds: string[], updates: Partial<Lead>): Promise<number> {
+    const dbInstance = this.getDb();
+    const batch = dbInstance.batch();
+    const now = new Date().toISOString();
+
+    leadIds.forEach((id) => {
+      const docRef = dbInstance.collection(this.collectionName).doc(id);
+      batch.set(docRef, { ...updates, updatedAt: now }, { merge: true });
+    });
+
+    await batch.commit();
+    return leadIds.length;
   }
 }

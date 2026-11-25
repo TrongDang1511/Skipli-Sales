@@ -35,4 +35,10 @@ router.patch('/:id', (req, res) => leadController.update(req, res));
 // 6. Xóa Lead
 router.delete('/:id', (req, res) => leadController.delete(req, res));
 
+// 7. Bàn giao 1 Lead lẻ cho Sales (Chỉ Admin)
+router.patch('/:id/assign', (req, res) => leadController.assignLead(req, res));
+
+// 8. Bàn giao hàng loạt nhiều Leads cùng lúc (Chỉ Admin)
+router.post('/bulk-assign', (req, res) => leadController.bulkAssign(req, res));
+
 export default router;

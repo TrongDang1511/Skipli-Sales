@@ -9,7 +9,13 @@
 
 import { Response } from 'express';
 import { LeadService } from '../services/lead.service';
-import { CreateLeadRequestSchema, GetLeadsQuerySchema, UpdateLeadRequestSchema } from '../dtos';
+import {
+  CreateLeadRequestSchema,
+  GetLeadsQuerySchema,
+  UpdateLeadRequestSchema,
+  AssignLeadRequestSchema,
+  BulkAssignLeadsRequestSchema,
+} from '../dtos';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 const leadService = new LeadService();
@@ -160,6 +166,63 @@ export class LeadController {
       return res.status(statusCode).json({
         success: false,
         message: err.message || 'Xóa nhà hàng thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 7. ADMIN BÀN GIAO 1 LEAD CHO SALES (PATCH /api/leads/:id/assign)
+   */
+  async assignLead(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+
+      const { id } = req.params;
+      const validated = AssignLeadRequestSchema.parse(req.body);
+      const lead = await leadService.assignLead(id, validated.targetSalesId, req.user);
+
+      return res.status(200).json({
+        success: true,
+        message: `Đã cập nhật phân bổ nhà hàng "${lead.restaurantName}" cho ${lead.assignedName} thành công!`,
+        data: lead,
+      });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Bàn giao nhà hàng thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 8. ADMIN BÀN GIAO HÀNG LOẠT (POST /api/leads/bulk-assign)
+   */
+  async bulkAssign(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+
+      const validated = BulkAssignLeadsRequestSchema.parse(req.body);
+      const result = await leadService.bulkAssignLeads(
+        validated.leadIds,
+        validated.targetSalesId,
+        req.user
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `Đã bàn giao thành công ${result.updatedCount} nhà hàng!`,
+        data: result,
+      });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Bàn giao hàng loạt thất bại!',
       });
     }
   }

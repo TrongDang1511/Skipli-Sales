@@ -9,15 +9,18 @@
 
 import crypto from 'crypto';
 import { LeadRepository } from '../repositories/lead.repository';
+import { UserRepository } from '../repositories/user.repository';
 import { CreateLeadRequestDto, GetLeadsQueryDto, UpdateLeadRequestDto } from '../dtos';
 import { Lead, LeadStatus } from '../models/lead.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 export class LeadService {
   private leadRepo: LeadRepository;
+  private userRepo: UserRepository;
 
   constructor() {
     this.leadRepo = new LeadRepository();
+    this.userRepo = new UserRepository();
   }
 
   /**
@@ -297,5 +300,99 @@ export class LeadService {
   async deleteLead(id: string, currentUser: NonNullable<AuthRequest['user']>): Promise<boolean> {
     const lead = await this.getLeadById(id, currentUser);
     return await this.leadRepo.delete(lead.id);
+  }
+
+  /**
+   * 7. ADMIN BÀN GIAO 1 LEAD CHO SALES VIÊN HOẶC THU HỒI VỀ KHO CHUNG
+   */
+  async assignLead(
+    leadId: string,
+    targetSalesId: string,
+    currentUser: NonNullable<AuthRequest['user']>
+  ): Promise<Lead> {
+    // Ràng buộc RBAC: Chỉ Quản trị viên mới có quyền điều chuyển lead
+    if (currentUser.role !== 'ADMIN') {
+      throw new Error('Chỉ Quản trị viên (Admin) mới có quyền phân bổ hoặc điều chuyển lead!');
+    }
+
+    const lead = await this.leadRepo.findById(leadId);
+    if (!lead) {
+      throw new Error('Không tìm thấy nhà hàng yêu cầu bàn giao!');
+    }
+
+    const now = new Date().toISOString();
+    let updates: Partial<Lead> = {};
+
+    // Trường hợp 1: Thu hồi lead về kho chung (Chưa phân công)
+    if (targetSalesId === 'UNASSIGNED') {
+      updates = {
+        assignedTo: '',
+        assignedPrefix: '',
+        assignedName: 'Chưa phân công',
+        updatedAt: now,
+      };
+    } else {
+      // Trường hợp 2: Bàn giao cho nhân viên Sales cụ thể
+      const targetUser = await this.userRepo.findById(targetSalesId);
+      if (!targetUser || !targetUser.isActive) {
+        throw new Error('Nhân viên Sales tiếp nhận không tồn tại hoặc tài khoản đang bị khóa!');
+      }
+
+      updates = {
+        assignedTo: targetUser.id,
+        assignedPrefix: targetUser.salesPrefix || 'SR',
+        assignedName: targetUser.fullName,
+        updatedAt: now,
+      };
+    }
+
+    const updated = await this.leadRepo.update(leadId, updates);
+    if (!updated) {
+      throw new Error('Cập nhật phân bổ lead thất bại!');
+    }
+
+    return updated;
+  }
+
+  /**
+   * 8. ADMIN BÀN GIAO HÀNG LOẠT (BULK ASSIGN) TRONG <100MS BẰNG BATCH WRITE
+   */
+  async bulkAssignLeads(
+    leadIds: string[],
+    targetSalesId: string,
+    currentUser: NonNullable<AuthRequest['user']>
+  ): Promise<{ updatedCount: number }> {
+    // Ràng buộc RBAC: Chỉ Quản trị viên mới có quyền phân bổ hàng loạt
+    if (currentUser.role !== 'ADMIN') {
+      throw new Error('Chỉ Quản trị viên (Admin) mới có quyền phân bổ lead hàng loạt!');
+    }
+
+    const now = new Date().toISOString();
+    let updates: Partial<Lead> = {};
+
+    if (targetSalesId === 'UNASSIGNED') {
+      updates = {
+        assignedTo: '',
+        assignedPrefix: '',
+        assignedName: 'Chưa phân công',
+        updatedAt: now,
+      };
+    } else {
+      const targetUser = await this.userRepo.findById(targetSalesId);
+      if (!targetUser || !targetUser.isActive) {
+        throw new Error('Nhân viên Sales tiếp nhận không tồn tại hoặc tài khoản đang bị khóa!');
+      }
+
+      updates = {
+        assignedTo: targetUser.id,
+        assignedPrefix: targetUser.salesPrefix || 'SR',
+        assignedName: targetUser.fullName,
+        updatedAt: now,
+      };
+    }
+
+    // Thực thi Batch Write thông qua Repository
+    const updatedCount = await this.leadRepo.bulkUpdate(leadIds, updates);
+    return { updatedCount };
   }
 }
