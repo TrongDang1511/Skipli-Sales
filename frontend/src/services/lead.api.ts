@@ -22,7 +22,7 @@ import {
  * HÀM TIỆN ÍCH: BÓC TÁCH THÔNG BÁO LỖI TỪ BACKEND
  * Đảm bảo Toast luôn hiển thị đúng câu thông báo tiếng Việt từ API, không bị văng [object Object]
  */
-export const extractApiErrorMessage = (error: any, fallbackMessage: string): string => {
+export const extractApiErrorMessage = (error: any, fallbackMessage: string = 'Đã có lỗi xảy ra!'): string => {
   if (error?.response?.data?.message) {
     return error.response.data.message;
   }
@@ -115,5 +115,35 @@ export const leadApi = {
   deleteLead: async (id: string): Promise<string> => {
     const res = await api.delete(`/leads/${id}`);
     return res.data.message || 'Đã xóa nhà hàng thành công!';
+  },
+
+  /**
+   * 8. BÀN GIAO 1 LEAD CHO SALES HOẶC THU HỒI VỀ KHO (CHỈ ADMIN)
+   * PATCH /api/leads/:id/assign
+   */
+  assignLead: async (
+    id: string,
+    targetSalesId: string
+  ): Promise<{ message: string; lead: Lead }> => {
+    const res = await api.patch(`/leads/${id}/assign`, { targetSalesId });
+    return {
+      message: res.data.message || 'Bàn giao nhà hàng thành công!',
+      lead: res.data.data,
+    };
+  },
+
+  /**
+   * 9. BÀN GIAO HÀNG LOẠT NHIỀU LEADS CÙNG LÚC (CHỈ ADMIN)
+   * POST /api/leads/bulk-assign
+   */
+  bulkAssignLeads: async (
+    leadIds: string[],
+    targetSalesId: string
+  ): Promise<{ message: string; updatedCount: number }> => {
+    const res = await api.post('/leads/bulk-assign', { leadIds, targetSalesId });
+    return {
+      message: res.data.message || 'Bàn giao hàng loạt thành công!',
+      updatedCount: res.data.data?.updatedCount || leadIds.length,
+    };
   },
 };

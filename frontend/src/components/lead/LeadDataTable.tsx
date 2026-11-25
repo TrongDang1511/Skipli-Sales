@@ -426,10 +426,13 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
           {/* Nút Làm Mới */}
           <button
             type="button"
-            onClick={() => fetchLeads()}
+            onClick={() => {
+              fetchLeads();
+              onLeadUpdated?.();
+            }}
             disabled={isLoading}
             className="p-2 rounded-xl text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors shadow-2xs"
-            title="Tải lại danh sách"
+            title="Tải lại danh sách và cập nhật chỉ số"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
           </button>

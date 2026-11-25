@@ -84,6 +84,17 @@ export interface UpdateLeadInput extends Omit<Partial<CreateLeadInput>, 'nextCal
   latestNote?: string;
 }
 
+// 5.1 DTO BÀN GIAO 1 LEAD CHO SALES HOẶC THU HỒI VỀ KHO
+export interface AssignLeadInput {
+  targetSalesId: string;
+}
+
+// 5.2 DTO BÀN GIAO HÀNG LOẠT (BULK ASSIGN)
+export interface BulkAssignLeadsInput {
+  leadIds: string[];
+  targetSalesId: string;
+}
+
 // 6. THAM SỐ TRUY VẤN DANH SÁCH LEADS (FILTER & PAGINATION)
 export interface GetLeadsParams {
   page?: number;                    // Trang hiện tại (mặc định: 1)
