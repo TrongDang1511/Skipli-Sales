@@ -25,6 +25,45 @@ export const FOLLOW_UP_STATUSES: LeadStatus[] = [
   'HOT_LEAD',
 ];
 
+// 2.1 CẤU HÌNH 3 SHEET TABS KIỂU GOOGLE SHEET CHO TRANG SALES
+export type LeadSheetKey = 'NEW' | 'FOLLOW_UP' | 'CLOSED';
+export type LeadScheduleFilter = 'ALL' | 'TODAY' | 'OVERDUE' | 'UPCOMING' | 'UNSCHEDULED';
+export type LeadSheetCounts = Record<LeadSheetKey, number>;
+
+export const LEAD_SHEETS_CONFIG: Array<{
+  key: LeadSheetKey;
+  label: string;
+  dotClass: string;
+  activeBadgeClass: string;
+}> = [
+  {
+    key: 'NEW',
+    label: 'New',
+    dotClass: 'bg-sky-500',
+    activeBadgeClass: 'bg-sky-100 text-sky-700',
+  },
+  {
+    key: 'FOLLOW_UP',
+    label: 'Follow-Up',
+    dotClass: 'bg-amber-500',
+    activeBadgeClass: 'bg-amber-100 text-amber-800',
+  },
+  {
+    key: 'CLOSED',
+    label: 'Closed (Won / Lost)',
+    dotClass: 'bg-emerald-500',
+    activeBadgeClass: 'bg-emerald-100 text-emerald-700',
+  },
+];
+
+export const SCHEDULE_FILTER_OPTIONS: Array<{ value: LeadScheduleFilter; label: string }> = [
+  { value: 'ALL', label: 'Lịch gọi: Tất cả' },
+  { value: 'TODAY', label: 'Cần gọi hôm nay' },
+  { value: 'OVERDUE', label: 'Quá hạn chưa gọi' },
+  { value: 'UPCOMING', label: 'Lịch sắp tới' },
+  { value: 'UNSCHEDULED', label: 'Chưa đặt lịch' },
+];
+
 // 3. THỰC THỂ LEAD ĐẦY ĐỦ PHÍA FRONTEND (ĐỒNG BỘ 100% VỚI FIRESTORE MODEL)
 export interface Lead {
   id: string;                       // Document UID của Firestore
@@ -100,6 +139,9 @@ export interface GetLeadsParams {
   page?: number;                    // Trang hiện tại (mặc định: 1)
   limit?: number;                   // Số dòng mỗi trang (mặc định: 25)
   status?: LeadStatus;              // Lọc theo trạng thái
+  sheet?: LeadSheetKey;             // Lọc theo nhóm Sheet (NEW | FOLLOW_UP | CLOSED)
+  schedule?: Exclude<LeadScheduleFilter, 'ALL'>; // Lọc theo Lịch gọi
+  todayDate?: string;               // Ngày hiện tại YYYY-MM-DD theo múi giờ Client
   state?: string;                   // Lọc theo bang
   search?: string;                  // Từ khóa tìm kiếm (Tên quán, SĐT, Mã TR-...)
   assignedTo?: string;              // Lọc theo Sales phụ trách (dành cho Admin)
@@ -112,6 +154,7 @@ export interface GetLeadsResponse {
   page: number;
   pageSize: number;
   totalPages: number;
+  sheetCounts?: LeadSheetCounts;
 }
 
 // 8. KẾT QUẢ KIỂM TRA TRÙNG SỐ ĐIỆN THOẠI (<20MS)
