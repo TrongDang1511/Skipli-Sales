@@ -48,53 +48,89 @@ export class LeadRepository {
   }
 
   /**
-   * 1. TÌM KIẾM TRÙNG CHÉO SỐ ĐIỆN THOẠI (<20MS)
-   * Quét trên cả 2 Single-Field Index: cleanPhone (Hotline quán) và cleanOwnerPhone (SĐT chủ quán)
+   * 1. TÌM KIẾM TRÙNG CHÉO SỐ ĐIỆN THOẠI (OVERLOAD: HỖ TRỢ CẢ 1 SỐ LẺ & MẢNG NHIỀU SỐ)
+   * - Truyền string   -> trả về Lead | null (dùng == & limit(1))
+   * - Truyền string[] -> trả về Lead[] (dùng 'in' chunk 30 số/lần)
    */
-  async findByCleanPhoneOrOwnerPhone(cleanPhone: string): Promise<Lead | null> {
+  async findByCleanPhoneOrOwnerPhone(cleanPhone: string): Promise<Lead | null>;
+  async findByCleanPhoneOrOwnerPhone(cleanPhones: string[]): Promise<Lead[]>;
+  async findByCleanPhoneOrOwnerPhone(input: string | string[]): Promise<Lead | null | Lead[]> {
     const leadsRef = this.getDb().collection(this.collectionName);
 
-    // Bước 1: Quét trên trường cleanPhone (Hotline chính của quán)
-    const hotlineSnap = await leadsRef.where('cleanPhone', '==', cleanPhone).limit(1).get();
-    if (!hotlineSnap.empty) {
-      return hotlineSnap.docs[0].data() as Lead;
+    // Nhánh 1: Kiểm tra 1 số lẻ (<20ms)
+    if (!Array.isArray(input)) {
+      const hotlineSnap = await leadsRef.where('cleanPhone', '==', input).limit(1).get();
+      if (!hotlineSnap.empty) {
+        return hotlineSnap.docs[0].data() as Lead;
+      }
+
+      const ownerSnap = await leadsRef.where('cleanOwnerPhone', '==', input).limit(1).get();
+      if (!ownerSnap.empty) {
+        return ownerSnap.docs[0].data() as Lead;
+      }
+
+      return null;
     }
 
-    // Bước 2: Quét trên trường cleanOwnerPhone (SĐT di động của chủ quán)
-    const ownerSnap = await leadsRef.where('cleanOwnerPhone', '==', cleanPhone).limit(1).get();
-    if (!ownerSnap.empty) {
-      return ownerSnap.docs[0].data() as Lead;
+    // Nhánh 2: Kiểm tra mảng nhiều số (Import Excel - chunk 30 số theo giới hạn của Firestore)
+    const uniquePhones = Array.from(new Set(input.filter((p) => p.length >= 10)));
+    if (uniquePhones.length === 0) return [];
+
+    const foundMap = new Map<string, Lead>();
+    for (let i = 0; i < uniquePhones.length; i += 30) {
+      const chunk = uniquePhones.slice(i, i + 30);
+      const [hotlineSnap, ownerSnap] = await Promise.all([
+        leadsRef.where('cleanPhone', 'in', chunk).get(),
+        leadsRef.where('cleanOwnerPhone', 'in', chunk).get(),
+      ]);
+
+      hotlineSnap.docs.forEach((doc) => {
+        const data = doc.data() as Lead;
+        foundMap.set(data.id, data);
+      });
+      ownerSnap.docs.forEach((doc) => {
+        const data = doc.data() as Lead;
+        foundMap.set(data.id, data);
+      });
     }
 
-    return null;
+    return Array.from(foundMap.values());
   }
 
   /**
-   * 2. SINH SỐ THỨ TỰ NGUYÊN TỬ CHO TIỀN TỐ CỦA SALES (ATOMIC TRANSACTION)
-   * Sử dụng runTransaction cấp Database Lock để đảm bảo mã TR-1001, TR-1002 tăng tuần tự
-   * không bao giờ bị nhảy cóc hoặc trùng lặp dưới mọi tải concurrency
+   * 2. XIN TRƯỚC MỘT DẢI SỐ THỨ TỰ NGUYÊN TỬ (ATOMIC BLOCK RESERVATION)
+   * Dùng chung cho cả tạo 1 Lead lẻ (count = 1) và Import Excel nhiều dòng (count = N)
    */
-  async getNextLeadSequence(prefix: string): Promise<number> {
+  async reserveLeadSequenceBlock(prefix: string, count: number): Promise<number> {
+    if (count <= 0) return 1001;
     const counterRef = this.getDb()
       .collection(this.counterCollectionName)
       .doc(`leads_${prefix.toUpperCase()}`);
 
     return await this.getDb().runTransaction(async (transaction) => {
       const doc = await transaction.get(counterRef);
-      let nextSeq = 1001; // Khởi đầu từ 1001 cho chuyên nghiệp
-
-      if (doc.exists) {
-        const currentSeq = doc.data()?.currentSequence || 1000;
-        nextSeq = currentSeq + 1;
-      }
+      const currentSeq = doc.exists ? doc.data()?.currentSequence || 1000 : 1000;
+      const startSeq = currentSeq + 1;
 
       transaction.set(
         counterRef,
-        { currentSequence: nextSeq, updatedAt: new Date().toISOString() },
+        {
+          prefix: prefix.toUpperCase(),
+          currentSequence: currentSeq + count,
+          updatedAt: new Date().toISOString(),
+        },
         { merge: true }
       );
-      return nextSeq;
+
+      return startSeq;
     });
+  }
+
+  /**
+   * 2.1 SINH SỐ THỨ TỰ LẺ CHO 1 LEAD (TÁI SỬ DỤNG TRỰC TIẾP reserveLeadSequenceBlock)
+   */
+  async getNextLeadSequence(prefix: string): Promise<number> {
+    return await this.reserveLeadSequenceBlock(prefix, 1);
   }
 
   /**
@@ -266,5 +302,22 @@ export class LeadRepository {
 
     await batch.commit();
     return leadIds.length;
+  }
+
+  /**
+   * 9. GHI HÀNG LOẠT NHIỀU LEADS BẰNG FIRESTORE WRITE BATCH (400 DOCS/CHUNK)
+   */
+  async createBatch(leads: Lead[]): Promise<void> {
+    const dbInstance = this.getDb();
+    const leadsRef = dbInstance.collection(this.collectionName);
+
+    for (let i = 0; i < leads.length; i += 400) {
+      const chunk = leads.slice(i, i + 400);
+      const batch = dbInstance.batch();
+      chunk.forEach((lead) => {
+        batch.set(leadsRef.doc(lead.id), lead);
+      });
+      await batch.commit();
+    }
   }
 }

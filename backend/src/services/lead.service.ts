@@ -12,6 +12,7 @@ import { LeadRepository, LeadSheetCounts } from '../repositories/lead.repository
 import { UserRepository } from '../repositories/user.repository';
 import {
   CreateLeadRequestDto,
+  ImportLeadsRequestDto,
   GetLeadsQueryDto,
   UpdateLeadRequestDto,
   LEAD_SHEET_STATUSES,
@@ -69,6 +70,35 @@ export class LeadService {
       isDuplicate: false,
       message: 'Số điện thoại hợp lệ, chưa có trong hệ thống.',
     };
+  }
+
+  /**
+   * 1.1 QUÉT TRÙNG DANH SÁCH SĐT CHO MÀN HÌNH PREVIEW EXCEL
+   */
+  async checkPhonesBatch(rawPhones: string[]): Promise<{
+    duplicates: Record<string, { restaurantName: string; assignedName: string; leadCustomId: string }>;
+  }> {
+    const cleanList = rawPhones
+      .map((p) => this.extractCleanPhone(p))
+      .filter((p) => p.length >= 10);
+
+    const existingLeads = await this.leadRepo.findByCleanPhoneOrOwnerPhone(cleanList);
+    const duplicates: Record<
+      string,
+      { restaurantName: string; assignedName: string; leadCustomId: string }
+    > = {};
+
+    existingLeads.forEach((lead) => {
+      const info = {
+        restaurantName: lead.restaurantName,
+        assignedName: lead.assignedName || 'Chưa phân công',
+        leadCustomId: lead.leadCustomId,
+      };
+      if (lead.cleanPhone) duplicates[lead.cleanPhone] = info;
+      if (lead.cleanOwnerPhone) duplicates[lead.cleanOwnerPhone] = info;
+    });
+
+    return { duplicates };
   }
 
   /**
@@ -153,6 +183,169 @@ export class LeadService {
     };
 
     return await this.leadRepo.create(newLead);
+  }
+
+  /**
+   * 2.1 IMPORT HÀNG LOẠT LEADS TỪ EXCEL (SALES: TỰ GÁN; ADMIN: CHƯA PHÂN CÔNG)
+   */
+  async importLeads(
+    dto: ImportLeadsRequestDto,
+    currentUser: NonNullable<AuthRequest['user']>
+  ): Promise<{
+    importedCount: number;
+    skippedDuplicateCount: number;
+    skippedInvalidCount: number;
+    skippedDetails: Array<{
+      rowNumber: number;
+      restaurantName: string;
+      hotline: string;
+      reason: string;
+    }>;
+  }> {
+    const isAdmin = currentUser.role === 'ADMIN';
+
+    // 1. Quét trùng trên toàn bộ SĐT hợp lệ của file bằng 1 lần query batch
+    const allCleanPhones: string[] = [];
+    dto.leads.forEach((item) => {
+      const c1 = this.extractCleanPhone(item.hotline);
+      if (c1.length >= 10) allCleanPhones.push(c1);
+      if (item.ownerPhone) {
+        const c2 = this.extractCleanPhone(item.ownerPhone);
+        if (c2.length >= 10) allCleanPhones.push(c2);
+      }
+    });
+
+    const existingLeads = await this.leadRepo.findByCleanPhoneOrOwnerPhone(allCleanPhones);
+    const dbPhoneSet = new Set<string>();
+    existingLeads.forEach((l) => {
+      if (l.cleanPhone) dbPhoneSet.add(l.cleanPhone);
+      if (l.cleanOwnerPhone) dbPhoneSet.add(l.cleanOwnerPhone);
+    });
+
+    // 2. Lọc dòng hợp lệ, chống trùng cả trong nội bộ file lẫn trên DB
+    const seenInFile = new Set<string>();
+    const validItems: Array<{
+      dto: CreateLeadRequestDto;
+      cleanPhone: string;
+      cleanOwnerPhone: string;
+    }> = [];
+    const skippedDetails: Array<{
+      rowNumber: number;
+      restaurantName: string;
+      hotline: string;
+      reason: string;
+    }> = [];
+    let skippedDuplicateCount = 0;
+    let skippedInvalidCount = 0;
+    const today = new Date().toISOString().slice(0, 10);
+
+    dto.leads.forEach((item, index) => {
+      const rowNumber = index + 1;
+      const cleanPhone = this.extractCleanPhone(item.hotline);
+      const cleanOwnerPhone = item.ownerPhone ? this.extractCleanPhone(item.ownerPhone) : '';
+
+      if (cleanPhone.length < 10) {
+        skippedInvalidCount++;
+        skippedDetails.push({
+          rowNumber,
+          restaurantName: item.restaurantName,
+          hotline: item.hotline,
+          reason: 'SĐT chưa đủ 10 số',
+        });
+        return;
+      }
+      if (item.nextCallDate && item.nextCallDate < today) {
+        skippedInvalidCount++;
+        skippedDetails.push({
+          rowNumber,
+          restaurantName: item.restaurantName,
+          hotline: item.hotline,
+          reason: 'Ngày hẹn nằm trong quá khứ',
+        });
+        return;
+      }
+      if (
+        dbPhoneSet.has(cleanPhone) ||
+        (cleanOwnerPhone.length >= 10 && dbPhoneSet.has(cleanOwnerPhone))
+      ) {
+        skippedDuplicateCount++;
+        skippedDetails.push({
+          rowNumber,
+          restaurantName: item.restaurantName,
+          hotline: item.hotline,
+          reason: 'SĐT đã tồn tại trong hệ thống',
+        });
+        return;
+      }
+      if (seenInFile.has(cleanPhone)) {
+        skippedDuplicateCount++;
+        skippedDetails.push({
+          rowNumber,
+          restaurantName: item.restaurantName,
+          hotline: item.hotline,
+          reason: 'Trùng SĐT với dòng trước trong file',
+        });
+        return;
+      }
+
+      seenInFile.add(cleanPhone);
+      if (cleanOwnerPhone.length >= 10) seenInFile.add(cleanOwnerPhone);
+      validItems.push({ dto: item, cleanPhone, cleanOwnerPhone });
+    });
+
+    if (validItems.length === 0) {
+      return {
+        importedCount: 0,
+        skippedDuplicateCount,
+        skippedInvalidCount,
+        skippedDetails,
+      };
+    }
+
+    // 3. Xin dải số thứ tự theo tiền tố người tạo
+    const creatorPrefix = currentUser.salesPrefix || 'LD';
+    let nextSeq = await this.leadRepo.reserveLeadSequenceBlock(creatorPrefix, validItems.length);
+    const now = new Date().toISOString();
+
+    const leadsToCreate: Lead[] = validItems.map((entry) => ({
+      id: 'lead_' + crypto.randomUUID(),
+      leadCustomId: `${creatorPrefix}-${nextSeq++}`,
+      restaurantName: entry.dto.restaurantName,
+      address: entry.dto.address || '',
+      city: entry.dto.city || '',
+      state: entry.dto.state,
+      hotline: entry.dto.hotline,
+      cleanPhone: entry.cleanPhone,
+      ownerName: entry.dto.ownerName || '',
+      ownerPhone: entry.dto.ownerPhone || '',
+      cleanOwnerPhone: entry.cleanOwnerPhone,
+      ownerEmail: entry.dto.ownerEmail || '',
+      googleMapsUrl: entry.dto.googleMapsUrl || '',
+      facebookUrl: entry.dto.facebookUrl || '',
+      status: 'NEW',
+      // Sales import -> tự gán cho chính Sales; Admin import -> mặc định Chưa phân công
+      assignedTo: isAdmin ? '' : currentUser.id,
+      assignedPrefix: isAdmin ? '' : creatorPrefix,
+      assignedName: isAdmin ? 'Chưa phân công' : currentUser.fullName,
+      latestNote: entry.dto.saleNote || '',
+      callCount: 0,
+      lastCallDate: null,
+      nextCallDate: entry.dto.nextCallDate || null,
+      dealValue: 0,
+      aiEvaluation: entry.dto.aiEvaluation || '',
+      createdAt: now,
+      updatedAt: now,
+      statusUpdatedAt: now,
+    }));
+
+    await this.leadRepo.createBatch(leadsToCreate);
+
+    return {
+      importedCount: leadsToCreate.length,
+      skippedDuplicateCount,
+      skippedInvalidCount,
+      skippedDetails,
+    };
   }
 
   /**
