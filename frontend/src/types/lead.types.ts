@@ -164,6 +164,46 @@ export interface CheckPhoneResponse {
   message?: string;
 }
 
+// 8.1 LOẠI KẾT QUẢ CUỘC GỌI & TIMELINE GHI CHÚ (POWER CALLING WORKSPACE)
+export type CallResultType =
+  | 'ANSWERED'
+  | 'CALLBACK'
+  | 'NO_ANSWER'
+  | 'BUSY'
+  | 'VOICEMAIL'
+  | 'NOTE_ONLY';
+
+export interface LeadNote {
+  id: string;
+  leadId: string;
+  authorId: string;
+  authorName: string;
+  authorPrefix: string;
+  callResult: CallResultType;
+  content: string;
+  nextCallDate?: string | null;
+  createdAt: string;
+}
+
+export interface CreateLeadNoteInput {
+  callResult: CallResultType;
+  content: string;
+  nextCallDate?: string | null;
+  status?: LeadStatus;
+}
+
+export const CALL_RESULT_CONFIG: Record<
+  CallResultType,
+  { label: string; badgeClass: string }
+> = {
+  ANSWERED: { label: 'Nghe máy', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  CALLBACK: { label: 'Hẹn gọi lại', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200' },
+  NO_ANSWER: { label: 'Không bắt máy', badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  BUSY: { label: 'Máy bận', badgeClass: 'bg-orange-50 text-orange-700 border-orange-200' },
+  VOICEMAIL: { label: 'Hộp thư thoại', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  NOTE_ONLY: { label: 'Ghi chú', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' },
+};
+
 // 9. BẢNG CẤU HÌNH GIAO DIỆN VÀ METADATA CHO 7 TRẠNG THÁI (SINGLE SOURCE OF TRUTH)
 export const LEAD_STATUS_CONFIG: Record<
   LeadStatus,

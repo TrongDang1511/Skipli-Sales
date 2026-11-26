@@ -7,7 +7,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Building2,
   Calendar,
@@ -19,20 +19,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { LeadDataTable } from '../components/lead/LeadDataTable';
+import { LeadPowerWorkspace } from '../components/lead/LeadPowerWorkspace';
 import { QuickAddLeadModal } from '../components/lead/QuickAddLeadModal';
 import { leadApi } from '../services/lead.api';
+import { Lead } from '../types/lead.types';
+import { getLocalDateString } from '@/lib/utils';
 
 export const SalesLeadsPage: React.FC = () => {
   const { user } = useAuth();
-
-  // Helper lấy ngày định dạng YYYY-MM-DD theo giờ địa phương (đồng bộ chuẩn 100% với LeadDataTable)
-  const getLocalDateString = (d: Date = new Date()): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const today = getLocalDateString();
 
   // Định dạng ngày hôm nay theo tiếng Việt chuẩn (VD: "Thứ Hai, 23/11/2026")
@@ -46,6 +40,61 @@ export const SalesLeadsPage: React.FC = () => {
 
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // State Power Calling Split View + Resizable Divider + Arrow Navigation
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [visibleLeads, setVisibleLeads] = useState<Lead[]>([]);
+  const [leftWidthPercent, setLeftWidthPercent] = useState(60);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  // Phím tắt mũi tên Lên/Xuống để chuyển nhanh giữa các Lead trong bảng trái
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedLead || visibleLeads.length === 0) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const idx = visibleLeads.findIndex((l) => l.id === selectedLead.id);
+        if (idx === -1) return;
+        e.preventDefault();
+        const nextIdx =
+          e.key === 'ArrowDown'
+            ? Math.min(idx + 1, visibleLeads.length - 1)
+            : Math.max(idx - 1, 0);
+        setSelectedLead(visibleLeads[nextIdx]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedLead, visibleLeads]);
+
+  // Xử lý kéo giãn thanh chia Split View (45% - 75%)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const rawPercent = ((e.clientX - rect.left) / rect.width) * 100;
+      const clamped = Math.min(75, Math.max(45, rawPercent));
+      setLeftWidthPercent(clamped);
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        document.body.style.cursor = '';
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Thống kê nhanh 4 thẻ KPI dựa trên dữ liệu thật
   const [stats, setStats] = useState({
@@ -235,12 +284,56 @@ export const SalesLeadsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* BẢNG DỮ LIỆU LEAD CHUẨN THỰC CHIẾN (LEADDATATABLE) */}
-        <LeadDataTable
-          onOpenAddModal={() => setIsAddLeadModalOpen(true)}
-          refreshTrigger={refreshTrigger}
-          onLeadUpdated={loadStats}
-        />
+        {/* SPLIT VIEW POWER CALLING: BẢNG TRÁI + WORKSPACE PHẢI */}
+        <div
+          ref={splitContainerRef}
+          className="flex flex-col lg:flex-row items-start gap-4 lg:gap-0"
+        >
+          <div
+            className="w-full min-w-0 transition-[width] duration-150"
+            style={
+              selectedLead && typeof window !== 'undefined' && window.innerWidth >= 1024
+                ? { width: `${leftWidthPercent}%` }
+                : undefined
+            }
+          >
+            <LeadDataTable
+              onOpenAddModal={() => setIsAddLeadModalOpen(true)}
+              refreshTrigger={refreshTrigger}
+              onLeadUpdated={loadStats}
+              selectedLeadId={selectedLead?.id || null}
+              onSelectLead={(lead) => setSelectedLead(lead)}
+              onLeadsLoaded={(items) => setVisibleLeads(items)}
+            />
+          </div>
+
+          {selectedLead && (
+            <>
+              {/* Thanh chia kéo giãn (chỉ hiện trên màn hình lớn) */}
+              <div
+                onMouseDown={() => {
+                  isDraggingRef.current = true;
+                  document.body.style.cursor = 'col-resize';
+                }}
+                className="hidden lg:flex w-3 self-stretch items-center justify-center cursor-col-resize group select-none shrink-0"
+                title="Kéo để điều chỉnh độ rộng bảng"
+              >
+                <div className="w-1 h-14 rounded-full bg-slate-200 group-hover:bg-sky-500 transition-colors" />
+              </div>
+
+              <div className="w-full lg:flex-1 min-w-0">
+                <LeadPowerWorkspace
+                  lead={selectedLead}
+                  onClose={() => setSelectedLead(null)}
+                  onLeadSynced={(updatedLead) => {
+                    setSelectedLead(updatedLead);
+                    setRefreshTrigger((prev) => prev + 1);
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </main>
 
       {/* Modal Thêm Lead Tốc Độ Cao */}

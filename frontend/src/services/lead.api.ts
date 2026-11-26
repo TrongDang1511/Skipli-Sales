@@ -10,7 +10,9 @@
 import { api } from './api';
 import {
   Lead,
+  LeadNote,
   CreateLeadInput,
+  CreateLeadNoteInput,
   UpdateLeadInput,
   GetLeadsParams,
   GetLeadsResponse,
@@ -144,6 +146,31 @@ export const leadApi = {
     return {
       message: res.data.message || 'Bàn giao hàng loạt thành công!',
       updatedCount: res.data.data?.updatedCount || leadIds.length,
+    };
+  },
+
+  /**
+   * 10. LẤY TIMELINE GHI CHÚ CUỘC GỌI CỦA 1 LEAD
+   * GET /api/leads/:id/notes
+   */
+  getLeadNotes: async (leadId: string): Promise<LeadNote[]> => {
+    const res = await api.get(`/leads/${leadId}/notes`);
+    return res.data.data || [];
+  },
+
+  /**
+   * 11. THÊM GHI CHÚ CUỘC GỌI MỚI (OPTIMISTIC WORKSPACE)
+   * POST /api/leads/:id/notes
+   */
+  createLeadNote: async (
+    leadId: string,
+    data: CreateLeadNoteInput
+  ): Promise<{ message: string; note: LeadNote; updatedLead: Lead }> => {
+    const res = await api.post(`/leads/${leadId}/notes`, data);
+    return {
+      message: res.data.message || 'Đã lưu ghi chú!',
+      note: res.data.data.note,
+      updatedLead: res.data.data.updatedLead,
     };
   },
 };
