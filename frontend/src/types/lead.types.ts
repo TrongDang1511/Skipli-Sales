@@ -7,7 +7,7 @@
  * ==============================================================================
  */
 
-// 1. 7 TRẠNG THÁI CHUẨN MỰC CỦA HỆ THỐNG PHỄU BÁN HÀNG
+// 1. 7 TRẠNG THÁI CHUẨN MỰC CỦA HỆ THỐNG   BÁN HÀNG
 export type LeadStatus =
   | 'NEW'              // Mới tạo, chưa gọi tiếp cận (Mặc định)
   | 'CALLING'          // Đang trong quy trình gọi tiếp cận
@@ -80,7 +80,7 @@ export interface Lead {
   ownerEmail: string;               // Email liên hệ của quán/chủ quán
   googleMapsUrl: string;            // Link Google Maps
   facebookUrl: string;              // Link Fanpage Facebook
-  status: LeadStatus;               // 1 trong 7 trạng thái phễu
+  status: LeadStatus;               // 1 trong 7 trạng thái  
   assignedTo: string;               // User ID của Sales phụ trách
   assignedPrefix: string;           // Tiền tố Sales (TR, SH, TC...)
   assignedName: string;             // Tên hiển thị của Sales phụ trách
@@ -93,7 +93,7 @@ export interface Lead {
   aiEvaluation?: string;            // Nhận xét đánh giá của AI
   createdAt: string;                // Ngày tạo (ISO string)
   updatedAt: string;                // Ngày cập nhật gần nhất (ISO string)
-  statusUpdatedAt?: string;         // Thời điểm đổi trạng thái phễu gần nhất (ISO string)
+  statusUpdatedAt?: string;         // Thời điểm đổi trạng thái   gần nhất (ISO string)
 }
 
 // 4. DTO ĐẦU VÀO FORM TẠO LEAD MỚI (QUICK ADD LEAD FORM)
