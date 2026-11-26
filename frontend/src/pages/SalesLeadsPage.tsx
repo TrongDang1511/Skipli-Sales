@@ -16,7 +16,6 @@ import {
   Clock,
   TrendingUp,
   Flame,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { LeadDataTable } from '../components/lead/LeadDataTable';
@@ -179,16 +178,6 @@ export const SalesLeadsPage: React.FC = () => {
 
         {/* Cụm Điều Khiển Bên Phải Tối Giản */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Nút Import Excel */}
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Import Excel</span>
-          </button>
-
           {/* Badge Tiền tố cá nhân */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-800 font-mono font-bold shadow-2xs">
             <UserCheck className="w-3.5 h-3.5 text-sky-600" />
@@ -312,6 +301,7 @@ export const SalesLeadsPage: React.FC = () => {
           >
             <LeadDataTable
               onOpenAddModal={() => setIsAddLeadModalOpen(true)}
+              onOpenImportModal={() => setIsImportModalOpen(true)}
               refreshTrigger={refreshTrigger}
               onLeadUpdated={loadStats}
               selectedLeadId={selectedLead?.id || null}

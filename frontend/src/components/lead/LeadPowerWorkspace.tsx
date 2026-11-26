@@ -303,7 +303,7 @@ export const LeadPowerWorkspace: React.FC<LeadPowerWorkspaceProps> = ({
               return (
                 <div
                   key={note.id}
-                  className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2"
+                  className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5"
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 min-w-0">

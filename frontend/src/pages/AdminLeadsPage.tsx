@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Building2, UserX, Target, DollarSign, Calendar, Plus, FileSpreadsheet } from 'lucide-react';
+import { Building2, UserX, Target, DollarSign, Calendar } from 'lucide-react';
 import { AdminLeadDataTable } from '../components/lead/AdminLeadDataTable';
 import { LeadPowerWorkspace } from '../components/lead/LeadPowerWorkspace';
 import { QuickAddLeadModal } from '../components/lead/QuickAddLeadModal';
@@ -100,26 +100,6 @@ export const AdminLeadsPage: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <span>{displayDate}</span>
           </div>
-
-          {/* Nút Import Excel */}
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Import Excel</span>
-          </button>
-
-          {/* Nút Thêm Mới Lead Nhanh */}
-          <button
-            type="button"
-            onClick={() => setIsAddLeadModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm shadow-sky-600/20 transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm Lead Mới</span>
-          </button>
         </div>
       </header>
 
@@ -223,6 +203,7 @@ export const AdminLeadsPage: React.FC = () => {
         {/* =================================================================== */}
         <AdminLeadDataTable
           onOpenAddModal={() => setIsAddLeadModalOpen(true)}
+          onOpenImportModal={() => setIsImportModalOpen(true)}
           refreshTrigger={refreshTrigger}
           onLeadUpdated={loadKpis}
           externalSalesFilter={activeKpiFilter}
