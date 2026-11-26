@@ -26,6 +26,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import { authApi, UserProfile } from '../../services/auth.api';
@@ -42,6 +43,8 @@ interface AdminLeadDataTableProps {
   externalSalesFilter?: string; // Hỗ trợ nhận filter từ thẻ KPI ở trang cha
   externalFilterTrigger?: number; // Nhịp kích hoạt mỗi lần bấm thẻ KPI (tránh xung đột khi đổi dropdown)
   onClearExternalFilter?: () => void;
+  selectedLeadId?: string | null;
+  onSelectLead?: (lead: Lead) => void;
 }
 
 export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
@@ -51,6 +54,8 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
   externalSalesFilter,
   externalFilterTrigger = 0,
   onClearExternalFilter,
+  selectedLeadId = null,
+  onSelectLead,
 }) => {
   const toast = useToast();
 
@@ -431,12 +436,17 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                 leads.map((lead, index) => {
                   const statusConf = LEAD_STATUS_CONFIG[lead.status] || LEAD_STATUS_CONFIG.NEW;
                   const isSelected = selectedLeadIds.includes(lead.id);
+                  const isActiveWorkspace = selectedLeadId === lead.id;
 
                   return (
                     <tr
                       key={lead.id}
                       className={`hover:bg-slate-50/70 transition-colors group cursor-pointer ${
-                        isSelected ? 'bg-sky-50/40' : ''
+                        isActiveWorkspace
+                          ? 'bg-sky-50/80 ring-1 ring-inset ring-sky-200'
+                          : isSelected
+                            ? 'bg-sky-50/40'
+                            : ''
                       }`}
                       onClick={() => setDetailModalLead(lead)}
                     >
@@ -504,9 +514,29 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                         />
                       </td>
 
-                      {/* Cột 8: Action 3 Chấm Chuẩn Hình Mẫu (View / Edit / Delete) */}
+                      {/* Cột 8: Nút Note & Action 3 Chấm Chuẩn Hình Mẫu */}
                       <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative inline-block text-left">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {onSelectLead && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectLead(lead);
+                              }}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
+                                isActiveWorkspace
+                                  ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
+                                  : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                              }`}
+                              title="Xem Timeline & Ghi chú cuộc gọi"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>Note</span>
+                            </button>
+                          )}
+
+                          <div className="relative inline-block text-left">
                           <button
                             type="button"
                             onClick={() => setActiveMenuId(activeMenuId === lead.id ? null : lead.id)}
@@ -552,6 +582,7 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                               </button>
                             </div>
                           )}
+                        </div>
                         </div>
                       </td>
                     </tr>

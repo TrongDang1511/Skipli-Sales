@@ -28,6 +28,7 @@ import {
   Globe,
   Share2,
   MapPin,
+  MessageSquare,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import {
@@ -49,28 +50,26 @@ import { WonDealModal } from './WonDealModal';
 import { LostReasonModal } from './LostReasonModal';
 import { LeadDetailModal } from './LeadDetailModal';
 import { LeadEditModal } from './LeadEditModal';
+import { getLocalDateString } from '@/lib/utils';
 
 interface LeadDataTableProps {
   onOpenAddModal?: () => void;
   refreshTrigger?: number;
   onLeadUpdated?: () => void;
+  selectedLeadId?: string | null;
+  onSelectLead?: (lead: Lead) => void;
+  onLeadsLoaded?: (leads: Lead[]) => void;
 }
 
 export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   onOpenAddModal,
   refreshTrigger = 0,
   onLeadUpdated,
+  selectedLeadId = null,
+  onSelectLead,
+  onLeadsLoaded,
 }) => {
   const toast = useToast();
-
-  // Helper lấy ngày định dạng YYYY-MM-DD theo giờ địa phương
-  const getLocalDateString = (d: Date = new Date()): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const today = getLocalDateString();
 
   const getQuickDate = (daysToAdd: number): string => {
@@ -159,7 +158,9 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
       }
 
       const res = await leadApi.getLeads(params);
-      setLeads(res.items || []);
+      const loadedItems = res.items || [];
+      setLeads(loadedItems);
+      onLeadsLoaded?.(loadedItems);
       setTotalLeads(res.total || 0);
       setTotalPages(res.totalPages || 1);
       if (res.sheetCounts) {
@@ -524,10 +525,14 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                   const isOverdue = lead.nextCallDate && lead.nextCallDate < today;
                   const isTodayCall = lead.nextCallDate === today;
 
+                  const isRowSelected = selectedLeadId === lead.id;
+
                   return (
                     <tr
                       key={lead.id}
-                      className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                      className={`hover:bg-slate-50/70 transition-colors group cursor-pointer ${
+                        isRowSelected ? 'bg-sky-50/80 ring-1 ring-inset ring-sky-200' : ''
+                      }`}
                       onClick={() => setDetailModalLead(lead)}
                     >
                       {/* Cột 1: Tên quán & Mã Lead */}
@@ -865,9 +870,29 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Cột 7: Thao tác Action 3 Chấm */}
+                      {/* Cột 7: Thao tác Note & Action 3 Chấm */}
                       <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative inline-block text-left">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {onSelectLead && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectLead(lead);
+                              }}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
+                                isRowSelected
+                                  ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
+                                  : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                              }`}
+                              title="Mở Timeline & Ghi chú cuộc gọi"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              <span>Note</span>
+                            </button>
+                          )}
+
+                          <div className="relative inline-block text-left">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -921,6 +946,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                               </button>
                             </div>
                           )}
+                        </div>
                         </div>
                       </td>
                     </tr>

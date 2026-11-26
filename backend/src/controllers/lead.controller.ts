@@ -9,8 +9,10 @@
 
 import { Response } from 'express';
 import { LeadService } from '../services/lead.service';
+import { LeadNoteService } from '../services/lead-note.service';
 import {
   CreateLeadRequestSchema,
+  CreateLeadNoteRequestSchema,
   GetLeadsQuerySchema,
   UpdateLeadRequestSchema,
   AssignLeadRequestSchema,
@@ -19,6 +21,7 @@ import {
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 const leadService = new LeadService();
+const leadNoteService = new LeadNoteService();
 
 export class LeadController {
   /**
@@ -223,6 +226,49 @@ export class LeadController {
       return res.status(statusCode).json({
         success: false,
         message: err.message || 'Bàn giao hàng loạt thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 9. LẤY TIMELINE GHI CHÚ CỦA 1 LEAD (GET /api/leads/:id/notes)
+   */
+  async getNotes(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+      const notes = await leadNoteService.getNotesByLeadId(req.params.id, req.user);
+      return res.status(200).json({ success: true, data: notes });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Lấy lịch sử ghi chú thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 10. THÊM GHI CHÚ CUỘC GỌI MỚI (POST /api/leads/:id/notes)
+   */
+  async addNote(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+      const validated = CreateLeadNoteRequestSchema.parse(req.body);
+      const result = await leadNoteService.addNote(req.params.id, validated, req.user);
+      return res.status(201).json({
+        success: true,
+        message: 'Đã lưu ghi chú cuộc gọi thành công!',
+        data: result,
+      });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Lưu ghi chú cuộc gọi thất bại!',
       });
     }
   }

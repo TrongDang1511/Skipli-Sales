@@ -10,12 +10,16 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, UserX, Target, DollarSign, Calendar, Plus } from 'lucide-react';
 import { AdminLeadDataTable } from '../components/lead/AdminLeadDataTable';
+import { LeadPowerWorkspace } from '../components/lead/LeadPowerWorkspace';
 import { QuickAddLeadModal } from '../components/lead/QuickAddLeadModal';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { leadApi } from '../services/lead.api';
+import { Lead } from '../types/lead.types';
 
 export const AdminLeadsPage: React.FC = () => {
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // State lọc được kích hoạt từ thẻ KPI
   const [activeKpiFilter, setActiveKpiFilter] = useState<string | undefined>(undefined);
@@ -212,7 +216,36 @@ export const AdminLeadsPage: React.FC = () => {
           externalSalesFilter={activeKpiFilter}
           externalFilterTrigger={kpiClickTick}
           onClearExternalFilter={() => setActiveKpiFilter(undefined)}
+          selectedLeadId={selectedLead?.id || null}
+          onSelectLead={(lead) => setSelectedLead(lead)}
         />
+
+        {/* Drawer Timeline & Ghi Chú Power Calling cho Admin */}
+        <Sheet
+          open={Boolean(selectedLead)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedLead(null);
+          }}
+        >
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-[460px] p-0 border-l border-slate-200 overflow-hidden [&>button]:hidden"
+          >
+            <SheetTitle className="sr-only">Lịch sử ghi chú cuộc gọi</SheetTitle>
+            {selectedLead && (
+              <LeadPowerWorkspace
+                variant="drawer"
+                lead={selectedLead}
+                onClose={() => setSelectedLead(null)}
+                onLeadSynced={(updatedLead) => {
+                  setSelectedLead(updatedLead);
+                  setRefreshTrigger((prev) => prev + 1);
+                  loadKpis();
+                }}
+              />
+            )}
+          </SheetContent>
+        </Sheet>
 
         {/* Modal Thêm Lead Nhanh */}
         <QuickAddLeadModal
