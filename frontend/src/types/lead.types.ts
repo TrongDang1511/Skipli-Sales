@@ -93,6 +93,7 @@ export interface Lead {
   aiEvaluation?: string;            // Nhận xét đánh giá của AI
   createdAt: string;                // Ngày tạo (ISO string)
   updatedAt: string;                // Ngày cập nhật gần nhất (ISO string)
+  statusUpdatedAt?: string;         // Thời điểm đổi trạng thái phễu gần nhất (ISO string)
 }
 
 // 4. DTO ĐẦU VÀO FORM TẠO LEAD MỚI (QUICK ADD LEAD FORM)
