@@ -42,4 +42,22 @@ export class LeadNoteRepository {
     await this.getDb().collection(this.collectionName).doc(note.id).set(note);
     return note;
   }
+
+  /**
+   * 3. LƯU HÀNG LOẠT GHI CHÚ BAN ĐẦU KHI IMPORT EXCEL (400 DOCS/CHUNK)
+   */
+  async createBatch(notes: LeadNote[]): Promise<void> {
+    if (notes.length === 0) return;
+    const dbInstance = this.getDb();
+    const notesRef = dbInstance.collection(this.collectionName);
+
+    for (let i = 0; i < notes.length; i += 400) {
+      const chunk = notes.slice(i, i + 400);
+      const batch = dbInstance.batch();
+      chunk.forEach((note) => {
+        batch.set(notesRef.doc(note.id), note);
+      });
+      await batch.commit();
+    }
+  }
 }

@@ -204,6 +204,28 @@ export const CALL_RESULT_CONFIG: Record<
   NOTE_ONLY: { label: 'Ghi chú', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
 
+// 8.2 IMPORT LEADS TỪ EXCEL (PREVIEW & KẾT QUẢ BATCH)
+export type ImportRowStatus = 'VALID' | 'INVALID' | 'DUPLICATE_IN_FILE' | 'DUPLICATE_IN_DB';
+
+export interface ImportLeadPreviewItem extends CreateLeadInput {
+  rowNumber: number;
+  status: ImportRowStatus;
+  errorMessage?: string;
+  duplicateInfo?: string;
+}
+
+export interface ImportLeadsResult {
+  importedCount: number;
+  skippedDuplicateCount: number;
+  skippedInvalidCount: number;
+  skippedDetails: Array<{
+    rowNumber: number;
+    restaurantName: string;
+    hotline: string;
+    reason: string;
+  }>;
+}
+
 // 9. BẢNG CẤU HÌNH GIAO DIỆN VÀ METADATA CHO 7 TRẠNG THÁI (SINGLE SOURCE OF TRUTH)
 export const LEAD_STATUS_CONFIG: Record<
   LeadStatus,

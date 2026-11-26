@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import { LeadRepository, LeadSheetCounts } from '../repositories/lead.repository';
+import { LeadNoteRepository } from '../repositories/lead-note.repository';
 import { UserRepository } from '../repositories/user.repository';
 import {
   CreateLeadRequestDto,
@@ -18,14 +19,17 @@ import {
   LEAD_SHEET_STATUSES,
 } from '../dtos';
 import { Lead, LeadStatus } from '../models/lead.model';
+import { LeadNote } from '../models/lead-note.model';
 import { AuthRequest } from '../middlewares/auth.middleware';
 
 export class LeadService {
   private leadRepo: LeadRepository;
+  private noteRepo: LeadNoteRepository;
   private userRepo: UserRepository;
 
   constructor() {
     this.leadRepo = new LeadRepository();
+    this.noteRepo = new LeadNoteRepository();
     this.userRepo = new UserRepository();
   }
 
@@ -182,7 +186,25 @@ export class LeadService {
       statusUpdatedAt: now,
     };
 
-    return await this.leadRepo.create(newLead);
+    const savedLead = await this.leadRepo.create(newLead);
+
+    // Nếu có ghi chú ban đầu khi tạo Lead -> lưu luôn vào timeline lead_notes
+    const initialNoteContent = (savedLead.latestNote || '').trim();
+    if (initialNoteContent !== '') {
+      await this.noteRepo.create({
+        id: 'note_' + crypto.randomUUID(),
+        leadId: savedLead.id,
+        authorId: currentUser.id,
+        authorName: currentUser.fullName,
+        authorPrefix: prefix,
+        callResult: 'NOTE_ONLY',
+        content: initialNoteContent,
+        nextCallDate: savedLead.nextCallDate || null,
+        createdAt: now,
+      });
+    }
+
+    return savedLead;
   }
 
   /**
@@ -339,6 +361,25 @@ export class LeadService {
     }));
 
     await this.leadRepo.createBatch(leadsToCreate);
+
+    // Tạo bản ghi note ban đầu trong lead_notes cho các dòng Excel có cột ghi chú
+    const initialNotes: LeadNote[] = leadsToCreate
+      .filter((lead) => (lead.latestNote || '').trim() !== '')
+      .map((lead) => ({
+        id: 'note_' + crypto.randomUUID(),
+        leadId: lead.id,
+        authorId: currentUser.id,
+        authorName: currentUser.fullName,
+        authorPrefix: creatorPrefix,
+        callResult: 'NOTE_ONLY',
+        content: (lead.latestNote || '').trim(),
+        nextCallDate: lead.nextCallDate || null,
+        createdAt: now,
+      }));
+
+    if (initialNotes.length > 0) {
+      await this.noteRepo.createBatch(initialNotes);
+    }
 
     return {
       importedCount: leadsToCreate.length,

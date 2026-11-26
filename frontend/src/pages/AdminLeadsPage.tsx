@@ -8,16 +8,18 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Building2, UserX, Target, DollarSign, Calendar, Plus } from 'lucide-react';
+import { Building2, UserX, Target, DollarSign, Calendar, Plus, FileSpreadsheet } from 'lucide-react';
 import { AdminLeadDataTable } from '../components/lead/AdminLeadDataTable';
 import { LeadPowerWorkspace } from '../components/lead/LeadPowerWorkspace';
 import { QuickAddLeadModal } from '../components/lead/QuickAddLeadModal';
+import { ExcelImportModal } from '../components/lead/ExcelImportModal';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { leadApi } from '../services/lead.api';
 import { Lead } from '../types/lead.types';
 
 export const AdminLeadsPage: React.FC = () => {
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
@@ -98,6 +100,16 @@ export const AdminLeadsPage: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <span>{displayDate}</span>
           </div>
+
+          {/* Nút Import Excel */}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Import Excel</span>
+          </button>
 
           {/* Nút Thêm Mới Lead Nhanh */}
           <button
@@ -252,6 +264,16 @@ export const AdminLeadsPage: React.FC = () => {
           isOpen={isAddLeadModalOpen}
           onClose={() => setIsAddLeadModalOpen(false)}
           onLeadCreated={() => {
+            setRefreshTrigger((prev) => prev + 1);
+            loadKpis();
+          }}
+        />
+
+        {/* Modal Import Excel */}
+        <ExcelImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={() => {
             setRefreshTrigger((prev) => prev + 1);
             loadKpis();
           }}
