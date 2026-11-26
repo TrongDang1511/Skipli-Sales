@@ -41,4 +41,10 @@ router.patch('/:id/assign', (req, res) => leadController.assignLead(req, res));
 // 8. Bàn giao hàng loạt nhiều Leads cùng lúc (Chỉ Admin)
 router.post('/bulk-assign', (req, res) => leadController.bulkAssign(req, res));
 
+// 9. Lấy lịch sử ghi chú cuộc gọi của Lead
+router.get('/:id/notes', (req, res) => leadController.getNotes(req, res));
+
+// 10. Thêm ghi chú cuộc gọi mới (tự động +1 callCount và cập nhật latestNote)
+router.post('/:id/notes', (req, res) => leadController.addNote(req, res));
+
 export default router;
