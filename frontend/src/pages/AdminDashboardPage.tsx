@@ -526,7 +526,7 @@ export const AdminDashboardPage: React.FC = () => {
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => navigate('/leads')}
+                    onClick={() => navigate('/leads?assignedTo=UNASSIGNED')}
                     className="rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold gap-1 shrink-0"
                   >
                     <span>Phân bổ</span>
@@ -543,7 +543,7 @@ export const AdminDashboardPage: React.FC = () => {
                       {data.actionQueue.unassignedQueue.map((item) => (
                         <div
                           key={item.id}
-                          onClick={() => navigate('/leads')}
+                          onClick={() => navigate('/leads?assignedTo=UNASSIGNED')}
                           className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors"
                         >
                           <div className="min-w-0">
@@ -582,7 +582,7 @@ export const AdminDashboardPage: React.FC = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate('/leads')}
+                    onClick={() => navigate('/leads?status=HOT_LEAD')}
                     className="rounded-xl border-slate-200 text-xs font-bold gap-1 shrink-0"
                   >
                     <span>Xem bảng</span>
@@ -599,7 +599,7 @@ export const AdminDashboardPage: React.FC = () => {
                       {data.actionQueue.neglectedHotLeads.map((item) => (
                         <div
                           key={item.id}
-                          onClick={() => navigate('/leads')}
+                          onClick={() => navigate(`/leads?status=${encodeURIComponent(item.status)}`)}
                           className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors"
                         >
                           <div className="min-w-0">

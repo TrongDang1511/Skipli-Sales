@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -54,6 +55,15 @@ import { LeadEditModal } from './LeadEditModal';
 import { getLocalDateString } from '@/lib/utils';
 import { exportLeadsToExcel } from '../../utils/excelLeadParser';
 
+const VALID_SHEETS: LeadSheetKey[] = ['NEW', 'FOLLOW_UP', 'CLOSED'];
+const VALID_SCHEDULES: LeadScheduleFilter[] = ['ALL', 'TODAY', 'OVERDUE', 'UPCOMING', 'UNSCHEDULED'];
+
+const parseValidSheet = (raw: string | null): LeadSheetKey =>
+  raw && VALID_SHEETS.includes(raw as LeadSheetKey) ? (raw as LeadSheetKey) : 'NEW';
+
+const parseValidSchedule = (raw: string | null): LeadScheduleFilter =>
+  raw && VALID_SCHEDULES.includes(raw as LeadScheduleFilter) ? (raw as LeadScheduleFilter) : 'ALL';
+
 interface LeadDataTableProps {
   onOpenAddModal?: () => void;
   onOpenImportModal?: () => void;
@@ -74,6 +84,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   onLeadsLoaded,
 }) => {
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const today = getLocalDateString();
 
   const getQuickDate = (daysToAdd: number): string => {
@@ -90,12 +101,39 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  // State bộ lọc, Sheet & tìm kiếm
+  // State bộ lọc, Sheet & tìm kiếm (khởi tạo trực tiếp từ URL Query Params nếu có)
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeSheet, setActiveSheet] = useState<LeadSheetKey>('NEW');
-  const [scheduleFilter, setScheduleFilter] = useState<LeadScheduleFilter>('ALL');
+  const [activeSheet, setActiveSheet] = useState<LeadSheetKey>(() =>
+    parseValidSheet(searchParams.get('sheet'))
+  );
+  const [scheduleFilter, setScheduleFilter] = useState<LeadScheduleFilter>(() =>
+    parseValidSchedule(searchParams.get('schedule'))
+  );
   const [stateFilter, setStateFilter] = useState<string>('ALL');
+
+  const updateUrlFilters = useCallback(
+    (nextSheet: LeadSheetKey, nextSchedule: LeadScheduleFilter) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (nextSheet === 'NEW') nextParams.delete('sheet');
+      else nextParams.set('sheet', nextSheet);
+
+      if (nextSchedule === 'ALL') nextParams.delete('schedule');
+      else nextParams.set('schedule', nextSchedule);
+
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  // Đồng bộ nếu URL thay đổi từ bên ngoài (Back/Forward hoặc deep-link mới)
+  useEffect(() => {
+    const urlSheet = parseValidSheet(searchParams.get('sheet'));
+    const urlSchedule = parseValidSchedule(searchParams.get('schedule'));
+
+    setActiveSheet((prev) => (prev !== urlSheet ? urlSheet : prev));
+    setScheduleFilter((prev) => (prev !== urlSchedule ? urlSchedule : prev));
+  }, [searchParams]);
   const [sheetCounts, setSheetCounts] = useState<LeadSheetCounts>({
     NEW: 0,
     FOLLOW_UP: 0,
@@ -458,8 +496,10 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             <select
               value={scheduleFilter}
               onChange={(e) => {
-                setScheduleFilter(e.target.value as LeadScheduleFilter);
+                const nextSchedule = e.target.value as LeadScheduleFilter;
+                setScheduleFilter(nextSchedule);
                 setPage(1);
+                updateUrlFilters(activeSheet, nextSchedule);
               }}
               className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer appearance-none"
             >
@@ -544,6 +584,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
           onChangeSheet={(nextSheet) => {
             setActiveSheet(nextSheet);
             setPage(1);
+            updateUrlFilters(nextSheet, scheduleFilter);
           }}
         />
 

@@ -198,7 +198,7 @@ export const SalesWorkspacePage: React.FC = () => {
               </Card>
 
               <Card
-                onClick={() => navigate('/workspace/leads')}
+                onClick={() => navigate('/workspace/leads?sheet=FOLLOW_UP&schedule=OVERDUE')}
                 className="rounded-3xl border-slate-200/80 hover:border-rose-300 shadow-xs bg-white cursor-pointer transition-colors"
               >
                 <CardContent className="p-5 flex items-center justify-between gap-3">

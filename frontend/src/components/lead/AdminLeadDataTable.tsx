@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -31,12 +32,25 @@ import {
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import { authApi, UserProfile } from '../../services/auth.api';
-import { Lead, LEAD_STATUS_CONFIG, US_STATES } from '../../types/lead.types';
+import { Lead, LeadStatus, LEAD_STATUS_CONFIG, US_STATES } from '../../types/lead.types';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminAssignDropdown } from './AdminAssignDropdown';
 import { LeadDetailModal } from './LeadDetailModal';
 import { LeadEditModal } from './LeadEditModal';
 import { exportLeadsToExcel } from '../../utils/excelLeadParser';
+
+const VALID_STATUSES: LeadStatus[] = [
+  'NEW',
+  'CALLING',
+  'LOW_INTERESTED',
+  'HIGH_INTERESTED',
+  'HOT_LEAD',
+  'WON',
+  'LOST',
+];
+
+const parseValidStatus = (raw: string | null): string =>
+  raw && VALID_STATUSES.includes(raw as LeadStatus) ? raw : 'ALL';
 
 interface AdminLeadDataTableProps {
   onOpenAddModal?: () => void;
@@ -62,6 +76,7 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
   onSelectLead,
 }) => {
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // State danh sách & phân trang
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -75,12 +90,39 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
   // State danh sách nhân viên Sales để phân bổ
   const [salesList, setSalesList] = useState<UserProfile[]>([]);
 
-  // State bộ lọc
+  // State bộ lọc (khởi tạo trực tiếp từ URL Query Params nếu có)
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    parseValidStatus(searchParams.get('status'))
+  );
   const [stateFilter, setStateFilter] = useState<string>('ALL');
-  const [salesFilter, setSalesFilter] = useState<string>('ALL');
+  const [salesFilter, setSalesFilter] = useState<string>(
+    () => searchParams.get('assignedTo')?.trim() || 'ALL'
+  );
+
+  const updateUrlFilters = useCallback(
+    (nextStatus: string, nextAssigned: string) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (nextStatus === 'ALL') nextParams.delete('status');
+      else nextParams.set('status', nextStatus);
+
+      if (nextAssigned === 'ALL') nextParams.delete('assignedTo');
+      else nextParams.set('assignedTo', nextAssigned);
+
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  // Đồng bộ nếu URL thay đổi từ bên ngoài (Back/Forward hoặc deep-link mới)
+  useEffect(() => {
+    const urlStatus = parseValidStatus(searchParams.get('status'));
+    const urlAssigned = searchParams.get('assignedTo')?.trim() || 'ALL';
+
+    setStatusFilter((prev) => (prev !== urlStatus ? urlStatus : prev));
+    setSalesFilter((prev) => (prev !== urlAssigned ? urlAssigned : prev));
+  }, [searchParams]);
 
   // Chỉ đồng bộ bộ lọc từ trang cha khi người dùng chủ động nhấp vào thẻ KPI
   const lastHandledFilterTickRef = useRef(0);
@@ -89,9 +131,11 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
       return;
     }
     lastHandledFilterTickRef.current = externalFilterTrigger;
-    setSalesFilter(externalSalesFilter || 'ALL');
+    const nextAssigned = externalSalesFilter || 'ALL';
+    setSalesFilter(nextAssigned);
     setPage(1);
-  }, [externalFilterTrigger, externalSalesFilter]);
+    updateUrlFilters(statusFilter, nextAssigned);
+  }, [externalFilterTrigger, externalSalesFilter, statusFilter, updateUrlFilters]);
 
   // State chọn nhiều (Bulk Selection) & Toolbar Inline Assignment
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -285,9 +329,11 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
             <select
               value={salesFilter}
               onChange={(e) => {
-                setSalesFilter(e.target.value);
+                const nextAssigned = e.target.value;
+                setSalesFilter(nextAssigned);
                 onClearExternalFilter?.();
                 setPage(1);
+                updateUrlFilters(statusFilter, nextAssigned);
               }}
               className={`pl-8 pr-3 py-2 border rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer appearance-none ${
                 salesFilter === 'UNASSIGNED'
@@ -311,8 +357,10 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value);
+                const nextStatus = e.target.value;
+                setStatusFilter(nextStatus);
                 setPage(1);
+                updateUrlFilters(nextStatus, salesFilter);
               }}
               className="pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer appearance-none"
             >
