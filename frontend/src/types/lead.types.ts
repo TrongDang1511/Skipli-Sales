@@ -227,6 +227,102 @@ export interface ImportLeadsResult {
   }>;
 }
 
+// 8.3 ADMIN DASHBOARD ANALYTICS
+export type DashboardPeriod = 'today' | '7d' | '30d' | 'all';
+
+export interface AdminDashboardResponse {
+  period: DashboardPeriod;
+  today: string;
+  kpis: {
+    wonRevenue: number;
+    wonCount: number;
+    pipelineTotal: number;
+    newCount: number;
+    followUpCount: number;
+    hotLeadCount: number;
+    unassignedCount: number;
+    overdueCount: number;
+    totalCalls: number;
+    answeredCount: number;
+    answeredRate: number;
+  };
+  funnel: Array<{
+    status: LeadStatus;
+    label: string;
+    count: number;
+    conversionFromPrev: number;
+  }>;
+  callOutcomes: Array<{
+    key: Exclude<CallResultType, 'NOTE_ONLY'>;
+    label: string;
+    count: number;
+    percent: number;
+  }>;
+  salesPerformance: Array<{
+    salesId: string;
+    salesPrefix: string;
+    fullName: string;
+    displayLabel: string;
+    calls: number;
+    wonCount: number;
+    wonRevenue: number;
+    overdueCount: number;
+    activeLeads: number;
+  }>;
+  lostReasons: Array<{
+    reason: string;
+    count: number;
+  }>;
+  actionQueue: {
+    unassignedQueue: Array<{
+      id: string;
+      leadCustomId: string;
+      restaurantName: string;
+      state: string;
+      hotline: string;
+      createdAt: string;
+    }>;
+    neglectedHotLeads: Array<{
+      id: string;
+      leadCustomId: string;
+      restaurantName: string;
+      status: LeadStatus;
+      assignedName: string;
+      assignedPrefix: string;
+      nextCallDate: string | null;
+      lastCallDate: string | null;
+    }>;
+  };
+}
+
+// 8.4 SALES DASHBOARD ANALYTICS
+export interface SalesDashboardResponse {
+  period: DashboardPeriod;
+  today: string;
+  kpis: {
+    dueTodayCount: number;
+    followUpTodayCount: number;
+    newAssignedCount: number;
+    overdueCount: number;
+    todayCallsCount: number;
+    dailyCallTarget: number;
+    wonCount: number;
+    wonRevenue: number;
+  };
+  dailyActivity: Array<{
+    date: string;
+    label: string;
+    calls: number;
+    hotOrWon: number;
+  }>;
+  statusBreakdown: Array<{
+    status: LeadStatus;
+    label: string;
+    count: number;
+  }>;
+  callQueue: Lead[];
+}
+
 // 9. BẢNG CẤU HÌNH GIAO DIỆN VÀ METADATA CHO 7 TRẠNG THÁI (SINGLE SOURCE OF TRUTH)
 export const LEAD_STATUS_CONFIG: Record<
   LeadStatus,
