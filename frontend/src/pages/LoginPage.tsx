@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { AuthLayout } from '../components/auth/AuthLayout';
+import { Button } from '@/components/ui/button';
 import { Mail, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -46,13 +47,13 @@ export const LoginPage: React.FC = () => {
 
   return (
     <AuthLayout>
-      {/* 1. Tiêu Đề Đăng Nhập Căn Giữa (Tương tự Hình 1) */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Đăng Nhập
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 mt-2">
-          Vui lòng nhập thông tin tài khoản để tiếp tục
+      {/* 1. Tiêu Đề Đăng Nhập Căn Giữa */}
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          Chào Mừng Trở Lại
+        </h1>
+        <p className="text-xs text-slate-500 mt-1.5">
+          Đăng nhập vào tài khoản Skipli Sales của bạn
         </p>
       </div>
 
@@ -114,11 +115,11 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Nút Submit Màu Xanh Dương Chủ Đạo Nổi Bật */}
-        <button
+        {/* Nút Submit shadcn Button */}
+        <Button
           type="submit"
           disabled={isLoading}
-          className="w-full mt-3 py-3.5 bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold rounded-xl text-sm shadow-md shadow-sky-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-70"
+          className="w-full h-11 mt-3 bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold rounded-xl text-sm shadow-md shadow-sky-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-70 cursor-pointer"
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -128,7 +129,7 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </>
           )}
-        </button>
+        </Button>
       </form>
     </AuthLayout>
   );

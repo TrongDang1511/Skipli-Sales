@@ -1,69 +1,103 @@
-import React from 'react';
-import BrandShowcase from './BrandShowcase';
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
-  heroTitle?: string;
-  heroSubtitle?: string;
+  sideImageSrc?: string;
 }
 
-export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, heroTitle, heroSubtitle }) => {
+const FALLBACK_HERO_IMAGE = '/crm-team.jpg';
+
+const AMBIENT_ORBS = [
+  {
+    className: 'skipli-orb-1 -top-40 -left-40 w-[520px] h-[520px] bg-sky-400/20',
+  },
+  {
+    className: 'skipli-orb-2 -bottom-48 -right-48 w-[580px] h-[580px] bg-sky-600/25',
+  },
+  {
+    className: 'skipli-orb-3 top-1/2 left-1/3 w-[420px] h-[420px] bg-cyan-400/15',
+  },
+] as const;
+
+export const AuthLayout: React.FC<AuthLayoutProps> = ({
+  children,
+  sideImageSrc = '/login-hero.png',
+}) => {
+  const [imgSrc, setImgSrc] = useState(sideImageSrc);
+
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white text-slate-800 font-sans selection:bg-sky-200">
-      {/* ========================================================================= */}
-      {/* CỘT TRÁI (46–48%): Deep Navy Luxury với Logo Skipli Khổng Lồ Nền          */}
-      {/* ========================================================================= */}
-      <div className="w-full lg:w-[48%] xl:w-[46%] relative bg-[#071E3D] p-6 sm:p-10 lg:p-12 flex items-center justify-center overflow-hidden min-h-[520px] lg:min-h-screen">
-        {/* LOGO SKIPLI KHỔNG LỒ LÀM NỀN (Cỡ Background, Thay Thế Gradient) */}
-        <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none">
-          <img
-            src="/Skipli_logo_blue.png"
-            alt=""
-            className="w-[130%] max-w-[760px] object-contain opacity-[0.12] filter blur-[0.5px] scale-110 -rotate-3 transition-transform duration-1000"
-          />
-        </div>
+    <div className="skipli-auth-bg relative min-h-screen w-full flex flex-col items-center justify-center p-6 md:p-10 overflow-hidden font-sans selection:bg-sky-200">
+      {/* Các dải sáng chuyển động mượt theo vòng lặp xoay quanh bảng màu Skipli */}
+      {AMBIENT_ORBS.map((orb, index) => (
+        <div
+          key={index}
+          className={`absolute rounded-full blur-3xl pointer-events-none ${orb.className}`}
+        />
+      ))}
 
-        {/* Vệt sáng cyber công nghệ dịu nhẹ */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-sky-600/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Lưới chấm công nghệ nhịp thở nhẹ */}
+      <div className="skipli-dot-grid absolute inset-0 pointer-events-none" />
 
-        {/* Lưới chấm mờ công nghệ */}
-        <div className="absolute inset-0 opacity-[0.035] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
-
-        {/* Thẻ Kính Mờ (Glassmorphism Frosted Card) Nổi Bật Trên Nền Logo Khổng Lồ */}
-        <BrandShowcase heroTitle={heroTitle} heroSubtitle={heroSubtitle} />
+      {/* Watermark logo Skipli chìm */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+        <img
+          src="/Skipli_logo_white.png"
+          alt=""
+          className="w-[900px] max-w-none object-contain opacity-[0.035] -rotate-6"
+        />
       </div>
 
-      {/* ========================================================================= */}
-      {/* CỘT PHẢI (52–54%): Form Trải Thoáng Trên Nền Trắng, Logo Không Nền       */}
-      {/* ========================================================================= */}
-      <div className="w-full lg:w-[52%] xl:w-[54%] bg-white flex flex-col justify-between min-h-screen px-6 py-8 sm:px-12 sm:py-12 lg:px-20 lg:py-14">
-        {/* 1. Header Trên Cùng: Logo Skipli (Bỏ khung nền, chỉ giữ logo đứng độc lập) */}
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="flex items-center gap-2.5 mb-1.5 select-none">
-            <img
-              src="/Skipli_logo_blue.png"
-              alt="Skipli Sales Logo"
-              className="h-8 w-auto object-contain shrink-0"
-            />
-            <span className="text-xl font-black text-slate-900 tracking-tight">
-              SKIPLI <span className="text-sky-600 font-extrabold">SALES</span>
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">
-            AI-Powered CRM System
-          </span>
-        </div>
+      {/* Khung trung tâm kiểu Shadcn login-04 */}
+      <div className="relative z-10 w-full max-w-sm md:max-w-4xl flex flex-col gap-5">
+        <Card className="overflow-hidden p-0 rounded-3xl border border-white/15 bg-white shadow-2xl shadow-black/40">
+          <CardContent className="grid p-0 md:grid-cols-2">
+            {/* Cột trái: Form đăng nhập / kích hoạt / khôi phục mật khẩu */}
+            <div className="p-6 sm:p-8 md:p-10 flex flex-col justify-between bg-white">
+              <div className="flex items-center justify-center gap-2 mb-6 select-none">
+                <img
+                  src="/Skipli_logo_blue.png"
+                  alt="Skipli Sales Logo"
+                  className="h-7 w-auto object-contain shrink-0"
+                />
+                <span className="text-lg font-black text-slate-900 tracking-tight">
+                  SKIPLI <span className="text-sky-600">SALES</span>
+                </span>
+              </div>
 
-        {/* 2. Nội Dung Form (Trực Tiếp Trên Nền Trắng, Không Có Viền Card Bao Quanh) */}
-        <div className="w-full max-w-md mx-auto my-auto py-8">
-          {children}
-        </div>
+              <div className="w-full my-auto">{children}</div>
 
-        {/* 3. Chân Trang: Dòng Bản Quyền Copyright */}
-        <div className="text-center text-xs text-slate-400 pt-6">
+              <p className="text-center text-[11px] text-slate-400 mt-6">
+                Hệ thống CRM nội bộ dành cho đội ngũ Skipli Sales
+              </p>
+            </div>
+
+            {/* Cột phải: Khung hình ảnh thương hiệu */}
+            <div className="relative hidden md:block bg-[#0B274D] min-h-[520px]">
+              <img
+                src={imgSrc}
+                alt="Skipli Sales Workspace"
+                onError={() => {
+                  if (imgSrc !== FALLBACK_HERO_IMAGE) setImgSrc(FALLBACK_HERO_IMAGE);
+                }}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#071E3D]/70 via-transparent to-[#071E3D]/15 pointer-events-none" />
+              <div className="absolute bottom-6 left-6 right-6 text-white">
+                <span className="inline-block px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md text-[10px] font-bold uppercase tracking-wider mb-2">
+                  AI-Powered CRM
+                </span>
+                <p className="text-sm font-semibold leading-snug text-white/95">
+                  Quản lý Leads nhà hàng, lịch hẹn gọi lại và hiệu suất chốt deal tập trung.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <p className="px-6 text-center text-xs text-slate-300/75">
           Copyright © 2026 - Skipli Sales CRM. All rights reserved.
-        </div>
+        </p>
       </div>
     </div>
   );
