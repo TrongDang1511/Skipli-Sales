@@ -26,7 +26,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  MessageSquare,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import { authApi, UserProfile } from '../../services/auth.api';
@@ -38,6 +38,7 @@ import { LeadEditModal } from './LeadEditModal';
 
 interface AdminLeadDataTableProps {
   onOpenAddModal?: () => void;
+  onOpenImportModal?: () => void;
   refreshTrigger?: number;
   onLeadUpdated?: () => void;
   externalSalesFilter?: string; // Hỗ trợ nhận filter từ thẻ KPI ở trang cha
@@ -49,6 +50,7 @@ interface AdminLeadDataTableProps {
 
 export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
   onOpenAddModal,
+  onOpenImportModal,
   refreshTrigger = 0,
   onLeadUpdated,
   externalSalesFilter,
@@ -312,6 +314,18 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
           </button>
 
+          {/* Nút Import Excel */}
+          {onOpenImportModal && (
+            <button
+              type="button"
+              onClick={onOpenImportModal}
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Import Excel</span>
+            </button>
+          )}
+
           {/* Nút Thêm Mới Lead */}
           {onOpenAddModal && (
             <button
@@ -413,6 +427,7 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                 <th className="px-4 py-4">HOTLINE</th>
                 <th className="px-4 py-4 text-center">STATUS</th>
                 <th className="px-4 py-4">LỊCH HẸN</th>
+                <th className="px-4 py-4">GHI CHÚ</th>
                 <th className="px-4 py-4">ASSIGNED TO</th>
                 <th className="px-4 py-4 text-right">ACTION</th>
               </tr>
@@ -421,14 +436,14 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading && leads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={9} className="px-6 py-16 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-sky-600 mb-2" />
                     <p className="font-medium">Đang tải danh sách nhà hàng...</p>
                   </td>
                 </tr>
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={9} className="px-6 py-16 text-center text-slate-400">
                     <p className="font-bold text-slate-700 text-sm">Không tìm thấy nhà hàng nào</p>
                   </td>
                 </tr>
@@ -502,7 +517,41 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                         {lead.nextCallDate ? lead.nextCallDate : '—'}
                       </td>
 
-                      {/* Cột 7: ASSIGNED TO (Dropdown 1-Click Bàn Giao Siêu Tinh Gọn) */}
+                      {/* Cột 7: Ghi Chú Mới Nhất + Nút Cây Bút Mở Timeline */}
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border max-w-[200px] ${
+                            isActiveWorkspace
+                              ? 'bg-sky-50/90 border-sky-300'
+                              : 'bg-slate-50/80 border-slate-200/80'
+                          }`}
+                        >
+                          <span
+                            className={`text-[11px] truncate ${
+                              lead.latestNote ? 'text-slate-700 font-medium' : 'text-slate-400 italic'
+                            }`}
+                            title={lead.latestNote || 'Chưa có ghi chú'}
+                          >
+                            {lead.latestNote || 'Chưa có ghi chú'}
+                          </span>
+                          {onSelectLead && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectLead(lead)}
+                              className={`p-1 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                                isActiveWorkspace
+                                  ? 'bg-sky-600 text-white'
+                                  : 'text-slate-400 hover:text-sky-600 hover:bg-white'
+                              }`}
+                              title="Xem Timeline & Ghi chú cuộc gọi"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Cột 8: ASSIGNED TO (Dropdown 1-Click Bàn Giao Siêu Tinh Gọn) */}
                       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <AdminAssignDropdown
                           currentAssignedId={lead.assignedTo}
@@ -514,29 +563,9 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                         />
                       </td>
 
-                      {/* Cột 8: Nút Note & Action 3 Chấm Chuẩn Hình Mẫu */}
+                      {/* Cột 9: Action 3 Chấm Chuẩn Hình Mẫu (View / Edit / Delete) */}
                       <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center justify-end gap-1.5">
-                          {onSelectLead && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectLead(lead);
-                              }}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
-                                isActiveWorkspace
-                                  ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                                  : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
-                              }`}
-                              title="Xem Timeline & Ghi chú cuộc gọi"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5" />
-                              <span>Note</span>
-                            </button>
-                          )}
-
-                          <div className="relative inline-block text-left">
+                        <div className="relative inline-block text-left">
                           <button
                             type="button"
                             onClick={() => setActiveMenuId(activeMenuId === lead.id ? null : lead.id)}
@@ -582,7 +611,6 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
                               </button>
                             </div>
                           )}
-                        </div>
                         </div>
                       </td>
                     </tr>

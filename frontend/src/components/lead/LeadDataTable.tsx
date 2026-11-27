@@ -28,7 +28,7 @@ import {
   Globe,
   Share2,
   MapPin,
-  MessageSquare,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import {
@@ -54,6 +54,7 @@ import { getLocalDateString } from '@/lib/utils';
 
 interface LeadDataTableProps {
   onOpenAddModal?: () => void;
+  onOpenImportModal?: () => void;
   refreshTrigger?: number;
   onLeadUpdated?: () => void;
   selectedLeadId?: string | null;
@@ -63,6 +64,7 @@ interface LeadDataTableProps {
 
 export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   onOpenAddModal,
+  onOpenImportModal,
   refreshTrigger = 0,
   onLeadUpdated,
   selectedLeadId = null,
@@ -457,6 +459,18 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
           </button>
 
+          {/* Nút Import Excel */}
+          {onOpenImportModal && (
+            <button
+              type="button"
+              onClick={onOpenImportModal}
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Import Excel</span>
+            </button>
+          )}
+
           {/* Nút Thêm Mới Lead */}
           {onOpenAddModal && (
             <button
@@ -494,6 +508,7 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                 <th className="px-4 py-4">Hotline & Chủ Quán</th>
                 <th className="px-4 py-4 text-center">STATUS</th>
                 <th className="px-4 py-4">Lịch Hẹn Gọi Tiếp Theo</th>
+                <th className="px-4 py-4">Ghi Chú</th>
                 <th className="px-4 py-4">Phụ Trách</th>
                 <th className="px-4 py-4 text-right">Thao Tác</th>
               </tr>
@@ -502,14 +517,14 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading && leads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-sky-600 mb-2" />
                     <p className="font-medium">Đang tải danh sách nhà hàng...</p>
                   </td>
                 </tr>
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400">
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
                       <Search className="w-5 h-5" />
                     </div>
@@ -858,7 +873,41 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Cột 6: Phụ trách (Assigned To) */}
+                      {/* Cột 6: Ghi Chú Mới Nhất + Nút Cây Bút Mở Timeline */}
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border max-w-[210px] ${
+                            isRowSelected
+                              ? 'bg-sky-50/90 border-sky-300'
+                              : 'bg-slate-50/80 border-slate-200/80'
+                          }`}
+                        >
+                          <span
+                            className={`text-[11px] truncate ${
+                              lead.latestNote ? 'text-slate-700 font-medium' : 'text-slate-400 italic'
+                            }`}
+                            title={lead.latestNote || 'Chưa có ghi chú'}
+                          >
+                            {lead.latestNote || 'Chưa có ghi chú'}
+                          </span>
+                          {onSelectLead && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectLead(lead)}
+                              className={`p-1 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                                isRowSelected
+                                  ? 'bg-sky-600 text-white'
+                                  : 'text-slate-400 hover:text-sky-600 hover:bg-white'
+                              }`}
+                              title="Mở Timeline & Ghi chú cuộc gọi"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Cột 7: Phụ trách (Assigned To) */}
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
@@ -870,29 +919,9 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Cột 7: Thao tác Note & Action 3 Chấm */}
+                      {/* Cột 8: Thao tác Action 3 Chấm */}
                       <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center justify-end gap-1.5">
-                          {onSelectLead && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelectLead(lead);
-                              }}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
-                                isRowSelected
-                                  ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
-                                  : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
-                              }`}
-                              title="Mở Timeline & Ghi chú cuộc gọi"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5" />
-                              <span>Note</span>
-                            </button>
-                          )}
-
-                          <div className="relative inline-block text-left">
+                        <div className="relative inline-block text-left">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -946,7 +975,6 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
                               </button>
                             </div>
                           )}
-                        </div>
                         </div>
                       </td>
                     </tr>

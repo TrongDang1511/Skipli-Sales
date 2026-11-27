@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { LeadDataTable } from '../components/lead/LeadDataTable';
 import { LeadPowerWorkspace } from '../components/lead/LeadPowerWorkspace';
 import { QuickAddLeadModal } from '../components/lead/QuickAddLeadModal';
+import { ExcelImportModal } from '../components/lead/ExcelImportModal';
 import { leadApi } from '../services/lead.api';
 import { Lead } from '../types/lead.types';
 import { getLocalDateString } from '@/lib/utils';
@@ -39,6 +40,7 @@ export const SalesLeadsPage: React.FC = () => {
   const displayDate = rawFormatted.charAt(0).toUpperCase() + rawFormatted.slice(1);
 
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // State Power Calling Split View + Resizable Divider + Arrow Navigation
@@ -175,7 +177,7 @@ export const SalesLeadsPage: React.FC = () => {
         </div>
 
         {/* Cụm Điều Khiển Bên Phải Tối Giản */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Badge Tiền tố cá nhân */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-800 font-mono font-bold shadow-2xs">
             <UserCheck className="w-3.5 h-3.5 text-sky-600" />
@@ -299,6 +301,7 @@ export const SalesLeadsPage: React.FC = () => {
           >
             <LeadDataTable
               onOpenAddModal={() => setIsAddLeadModalOpen(true)}
+              onOpenImportModal={() => setIsImportModalOpen(true)}
               refreshTrigger={refreshTrigger}
               onLeadUpdated={loadStats}
               selectedLeadId={selectedLead?.id || null}
@@ -341,6 +344,15 @@ export const SalesLeadsPage: React.FC = () => {
         isOpen={isAddLeadModalOpen}
         onClose={() => setIsAddLeadModalOpen(false)}
         onLeadCreated={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Modal Import Excel */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImported={() => {
           setRefreshTrigger((prev) => prev + 1);
         }}
       />

@@ -13,6 +13,7 @@ import {
   LeadNote,
   CreateLeadInput,
   CreateLeadNoteInput,
+  ImportLeadsResult,
   UpdateLeadInput,
   GetLeadsParams,
   GetLeadsResponse,
@@ -171,6 +172,31 @@ export const leadApi = {
       message: res.data.message || 'Đã lưu ghi chú!',
       note: res.data.data.note,
       updatedLead: res.data.data.updatedLead,
+    };
+  },
+
+  /**
+   * 12. KIỂM TRA TRÙNG NHIỀU SĐT CÙNG LÚC CHO BẢNG PREVIEW EXCEL
+   * POST /api/leads/check-phone
+   */
+  checkPhonesDuplicate: async (
+    phones: string[]
+  ): Promise<Record<string, { restaurantName: string; assignedName: string; leadCustomId: string }>> => {
+    const res = await api.post('/leads/check-phone', { phones });
+    return res.data.data?.duplicates || {};
+  },
+
+  /**
+   * 13. IMPORT HÀNG LOẠT LEADS TỪ EXCEL
+   * POST /api/leads/import
+   */
+  importLeads: async (
+    leads: CreateLeadInput[]
+  ): Promise<{ message: string; result: ImportLeadsResult }> => {
+    const res = await api.post('/leads/import', { leads });
+    return {
+      message: res.data.message || 'Import thành công!',
+      result: res.data.data,
     };
   },
 };

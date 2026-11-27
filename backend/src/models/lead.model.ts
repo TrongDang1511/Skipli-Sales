@@ -7,7 +7,7 @@
  * ==============================================================================
  */
 
-// Danh sách 7 trạng thái chuẩn trong phễu bán hàng Skipli
+// Danh sách 7 trạng thái chuẩn trong   bán hàng Skipli
 export type LeadStatus =
   | 'NEW'              // Mới tạo, chưa gọi điện lần nào (Mặc định)
   | 'CALLING'          // Đang trong quy trình gọi tiếp cận
@@ -32,7 +32,7 @@ export interface Lead {
   ownerEmail?: string;             // Địa chỉ email liên hệ của quán hoặc chủ quán (Tùy chọn)
   googleMapsUrl?: string;          // Đường dẫn định vị Google Maps để xem hình ảnh, vị trí quán (Tùy chọn)
   facebookUrl?: string;            // Đường dẫn Fanpage Facebook của nhà hàng (Tùy chọn)
-  status: LeadStatus;              // Trạng thái hiện tại trong phễu bán hàng (7 trạng thái)
+  status: LeadStatus;              // Trạng thái hiện tại trong   bán hàng (7 trạng thái)
   assignedTo: string;              // UID của tài khoản Sales phụ trách lead này
   assignedPrefix: string;          // Tiền tố mã của Sales phụ trách (VD: "TR", "TC", "SH")
   assignedName: string;            // Họ và tên hiển thị của Sales phụ trách (VD: "Trọng", "Tuấn")
@@ -45,5 +45,5 @@ export interface Lead {
   aiEvaluation?: string;           // Nhận xét, đánh giá sơ bộ của AI về tiềm năng quán
   createdAt: string;               // Thời gian tạo bản ghi (ISO 8601 String)
   updatedAt: string;               // Thời gian cập nhật bản ghi gần nhất (ISO 8601 String)
-  statusUpdatedAt?: string;        // Thời điểm chuyển trạng thái phễu gần nhất (ISO 8601 String)
+  statusUpdatedAt?: string;        // Thời điểm chuyển trạng thái   gần nhất (ISO 8601 String)
 }

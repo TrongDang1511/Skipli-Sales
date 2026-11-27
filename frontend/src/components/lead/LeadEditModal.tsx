@@ -2,14 +2,13 @@
  * ==============================================================================
  * DỰ ÁN: SKIPLI SALES INTERNAL CRM
  * FILE: frontend/src/components/lead/LeadEditModal.tsx
- * PHÂN LOẠI: UI COMPONENT (MODAL CHỈNH SỬA LEAD)
- * VAI TRÒ: Cập Nhật Thông Tin Nhà Hàng, Chủ Quán, SĐT, Ngày Hẹn, Ghi Chú Với Ràng Buộc Kiểm Tra Trùng
+ * PHÂN LOẠI: UI COMPONENT (MODAL CHỈNH SỬA LEAD - SHADCN/UI)
+ * VAI TRÒ: Cập Nhật Đầy Đủ Thông Tin Nhà Hàng, Chủ Quán, SĐT, Liên Kết, Đánh Giá AI & Lịch Hẹn
  * ==============================================================================
  */
 
 import React, { useState, useEffect } from 'react';
 import {
-  X,
   Store,
   MapPin,
   Phone,
@@ -21,12 +20,29 @@ import {
   Share2,
   Calendar,
   FileText,
+  Sparkles,
+  Trophy,
+  XCircle,
   AlertCircle,
   Save,
   Loader2,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { getLocalDateString } from '@/lib/utils';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
-import { Lead, UpdateLeadInput, US_STATES } from '../../types/lead.types';
+import { Lead, UpdateLeadInput, US_STATES, LOST_REASONS } from '../../types/lead.types';
 import { useToast } from '../../contexts/ToastContext';
 import { formatUsPhoneNumber } from './QuickAddLeadModal';
 
@@ -44,7 +60,7 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
   onLeadUpdated,
 }) => {
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
 
   const [restaurantName, setRestaurantName] = useState('');
   const [state, setState] = useState('VA');
@@ -58,13 +74,15 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
   const [facebookUrl, setFacebookUrl] = useState('');
   const [nextCallDate, setNextCallDate] = useState('');
   const [latestNote, setLatestNote] = useState('');
+  const [aiEvaluation, setAiEvaluation] = useState('');
+  const [dealValue, setDealValue] = useState('0');
+  const [lostReason, setLostReason] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Nạp dữ liệu cũ của lead khi modal mở ra
   useEffect(() => {
-    if (lead) {
+    if (lead && isOpen) {
       setRestaurantName(lead.restaurantName || '');
       setState(lead.state || 'VA');
       setCity(lead.city || '');
@@ -77,18 +95,21 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
       setFacebookUrl(lead.facebookUrl || '');
       setNextCallDate(lead.nextCallDate || '');
       setLatestNote(lead.latestNote || '');
+      setAiEvaluation(lead.aiEvaluation || '');
+      setDealValue(String(lead.dealValue ?? 0));
+      setLostReason(lead.lostReason || '');
       setFormError('');
     }
   }, [lead, isOpen]);
 
-  if (!isOpen || !lead) return null;
+  if (!lead) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
-    if (!restaurantName.trim()) {
-      setFormError('Vui lòng nhập tên nhà hàng!');
+    if (!restaurantName.trim() || restaurantName.trim().length < 2) {
+      setFormError('Vui lòng nhập tên nhà hàng (ít nhất 2 ký tự)!');
       return;
     }
 
@@ -118,14 +139,14 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
         facebookUrl: facebookUrl.trim(),
         nextCallDate: nextCallDate ? nextCallDate.trim() : null,
         latestNote: latestNote.trim(),
+        aiEvaluation: aiEvaluation.trim(),
+        ...(lead.status === 'WON' ? { dealValue: Number(dealValue) || 0 } : {}),
+        ...(lead.status === 'LOST' ? { lostReason: lostReason.trim() } : {}),
       };
 
       const res = await leadApi.updateLead(lead.id, updates);
       toast.success(res.message || 'Cập nhật thông tin nhà hàng thành công!');
-
-      if (onLeadUpdated && res.lead) {
-        onLeadUpdated(res.lead);
-      }
+      onLeadUpdated?.(res.lead);
       onClose();
     } catch (err: any) {
       const msg = extractApiErrorMessage(err, 'Cập nhật thất bại!');
@@ -136,272 +157,353 @@ export const LeadEditModal: React.FC<LeadEditModalProps> = ({
     }
   };
 
+  const inputClass =
+    'w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-2xl overflow-hidden animate-scale-in max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="p-5 bg-[#FAF8F5] border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#071E3D] text-white flex items-center justify-center shadow-xs">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-3xl border-slate-200 bg-white gap-0">
+        {/* 1. HEADER */}
+        <DialogHeader className="px-6 py-4 bg-[#FAF8F5] border-b border-slate-200/80 text-left">
+          <div className="flex items-center gap-3 pr-6">
+            <div className="w-10 h-10 rounded-2xl bg-[#071E3D] text-white flex items-center justify-center shadow-xs shrink-0">
               <Store className="w-5 h-5 text-sky-300" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-slate-900 tracking-tight">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="text-base font-black text-slate-900 tracking-tight">
                   Chỉnh Sửa Thông Tin Nhà Hàng
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-mono font-bold">
-                  {lead.leadCustomId}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Cập nhật thông tin định danh, liên hệ và lịch hẹn bám đuổi
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form Error */}
-        {formError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700 shrink-0">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-            <span>{formError}</span>
-          </div>
-        )}
-
-        {/* Scrollable Form Body */}
-        <form id="edit-lead-form" onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
-          {/* Tên quán */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Tên Nhà Hàng / Quán Ăn <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={restaurantName}
-                onChange={(e) => setRestaurantName(e.target.value)}
-                required
-                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-              />
-            </div>
-          </div>
-
-          {/* Bang & Thành phố */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Bang <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <select
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
+                </DialogTitle>
+                <Badge
+                  variant="secondary"
+                  className="font-mono text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-900 px-2 py-0.5 rounded-md"
                 >
-                  {US_STATES.map((st) => (
-                    <option key={st.code} value={st.code}>
-                      {st.code} - {st.name}
-                    </option>
-                  ))}
-                </select>
+                  {lead.leadCustomId}
+                </Badge>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Thành Phố</label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="VD: Westminster"
-                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-              />
+              <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                Cập nhật thông tin định danh, liên hệ, liên kết mạng xã hội và đánh giá
+              </DialogDescription>
             </div>
           </div>
+        </DialogHeader>
 
-          {/* Địa chỉ quán */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Địa Chỉ Quán</label>
-            <div className="relative">
-              <Navigation className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="VD: 9941 Bolsa Ave"
-                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-              />
-            </div>
-          </div>
+        {/* 2. FORM BODY */}
+        <form onSubmit={handleSubmit}>
+          <ScrollArea className="max-h-[68vh]">
+            <div className="p-6 space-y-5 text-xs">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
-          {/* Hotline & SĐT Chủ */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Hotline Nhà Hàng <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={hotline}
-                  onChange={(e) => setHotline(formatUsPhoneNumber(e.target.value))}
-                  required
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
+              {/* Nhóm 1: Định danh & Vị trí */}
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Thông Tin Định Danh & Vị Trí
+                </h4>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Tên Nhà Hàng / Quán Ăn <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Store className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={restaurantName}
+                      onChange={(e) => setRestaurantName(e.target.value)}
+                      placeholder="VD: Pho Saigon 168"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Bang <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <select
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className={`${inputClass} cursor-pointer font-bold`}
+                      >
+                        {US_STATES.map((st) => (
+                          <option key={st.code} value={st.code}>
+                            {st.code} - {st.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Thành Phố</label>
+                    <div className="relative">
+                      <Navigation className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="VD: San Jose"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Địa Chỉ Quán</label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Số nhà, tên đường..."
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="bg-slate-100" />
+
+              {/* Nhóm 2: Liên hệ & Chủ quán */}
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Liên Hệ Nhà Hàng & Chủ Quán
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Hotline Nhà Hàng <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-sky-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={hotline}
+                        onChange={(e) => setHotline(formatUsPhoneNumber(e.target.value))}
+                        placeholder="(408) 555-0199"
+                        className={`${inputClass} font-mono font-bold`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">SĐT Di Động Chủ</label>
+                    <div className="relative">
+                      <Smartphone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={ownerPhone}
+                        onChange={(e) => setOwnerPhone(formatUsPhoneNumber(e.target.value))}
+                        placeholder="(408) 555-0188"
+                        className={`${inputClass} font-mono`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Tên Chủ Quán</label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-amber-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={ownerName}
+                        onChange={(e) => setOwnerName(e.target.value)}
+                        placeholder="Tên chủ quán / quản lý"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Email Chủ Quán</label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={ownerEmail}
+                        onChange={(e) => setOwnerEmail(e.target.value)}
+                        placeholder="owner@restaurant.com"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Link Google Maps</label>
+                    <div className="relative">
+                      <Globe className="w-4 h-4 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={googleMapsUrl}
+                        onChange={(e) => setGoogleMapsUrl(e.target.value)}
+                        placeholder="https://maps.google.com/..."
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Link Facebook</label>
+                    <div className="relative">
+                      <Share2 className="w-4 h-4 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={facebookUrl}
+                        onChange={(e) => setFacebookUrl(e.target.value)}
+                        placeholder="https://facebook.com/..."
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="bg-slate-100" />
+
+              {/* Nhóm 3: Lịch hẹn, Kết quả Deal & Ghi chú */}
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Lịch Hẹn, Ghi Chú & Đánh Giá
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Hạn Chót Hẹn Gọi Lại (Next Call Date ≥ Hôm Nay)
+                    </label>
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="date"
+                        min={today}
+                        value={nextCallDate}
+                        onChange={(e) => setNextCallDate(e.target.value)}
+                        className={`${inputClass} font-mono`}
+                      />
+                    </div>
+                  </div>
+
+                  {lead.status === 'WON' && (
+                    <div>
+                      <label className="block font-bold text-emerald-700 mb-1">
+                        Giá Trị Hợp Đồng (USD)
+                      </label>
+                      <div className="relative">
+                        <Trophy className="w-4 h-4 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="number"
+                          min={0}
+                          value={dealValue}
+                          onChange={(e) => setDealValue(e.target.value)}
+                          className={`${inputClass} font-mono font-bold text-emerald-700`}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {lead.status === 'LOST' && (
+                    <div>
+                      <label className="block font-bold text-rose-700 mb-1">
+                        Lý Do Thất Bại (LOST)
+                      </label>
+                      <div className="relative">
+                        <XCircle className="w-4 h-4 text-rose-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          value={lostReason}
+                          onChange={(e) => setLostReason(e.target.value)}
+                          className={`${inputClass} cursor-pointer`}
+                        >
+                          <option value="">-- Chọn lý do --</option>
+                          {LOST_REASONS.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+                      <FileText className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Ghi Chú Mới Nhất</span>
+                    </label>
+                    <Textarea
+                      rows={3}
+                      value={latestNote}
+                      onChange={(e) => setLatestNote(e.target.value)}
+                      placeholder="Tóm tắt tình trạng hoặc trao đổi gần nhất..."
+                      className="rounded-2xl border-slate-200 bg-slate-50 focus-visible:bg-white text-xs resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Nhận Xét / Đánh Giá AI</span>
+                    </label>
+                    <Textarea
+                      rows={3}
+                      value={aiEvaluation}
+                      onChange={(e) => setAiEvaluation(e.target.value)}
+                      placeholder="Đánh giá tiềm năng hoặc gợi ý từ AI..."
+                      className="rounded-2xl border-slate-200 bg-indigo-50/30 focus-visible:bg-white text-xs resize-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
+          </ScrollArea>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">SĐT Di Động Chủ</label>
-              <div className="relative">
-                <Smartphone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(formatUsPhoneNumber(e.target.value))}
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
-              </div>
-            </div>
-          </div>
+          <Separator className="bg-slate-200/80" />
 
-          {/* Tên chủ & Email */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tên Chủ Quán</label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
-              </div>
-            </div>
+          {/* 3. FOOTER */}
+          <DialogFooter className="px-6 py-3.5 bg-[#FAF8F5]/70 flex items-center justify-between sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-xl text-xs"
+            >
+              Hủy
+            </Button>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Chủ Quán</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  value={ownerEmail}
-                  onChange={(e) => setOwnerEmail(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Links: Google Maps & Facebook */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Link Google Maps</label>
-              <div className="relative">
-                <Globe className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="url"
-                  value={googleMapsUrl}
-                  onChange={(e) => setGoogleMapsUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Link Facebook</label>
-              <div className="relative">
-                <Share2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="url"
-                  value={facebookUrl}
-                  onChange={(e) => setFacebookUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Hẹn gọi lại */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Hạn Chót Hẹn Gọi Lại (Next Call Date ≥ Hôm Nay)
-            </label>
-            <div className="relative">
-              <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="date"
-                min={today}
-                value={nextCallDate}
-                onChange={(e) => setNextCallDate(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs cursor-pointer"
-              />
-            </div>
-          </div>
-
-          {/* Ghi chú */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Ghi Chú Cuộc Gọi / Đánh Giá</label>
-            <div className="relative">
-              <FileText className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <textarea
-                rows={2}
-                value={latestNote}
-                onChange={(e) => setLatestNote(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-2xs resize-none"
-              />
-            </div>
-          </div>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold gap-1.5"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang lưu...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Lưu Thay Đổi</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </form>
-
-        {/* Footer */}
-        <div className="p-4 px-6 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/60 transition-colors"
-          >
-            Hủy
-          </button>
-
-          <button
-            type="submit"
-            form="edit-lead-form"
-            disabled={isSubmitting}
-            className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm shadow-sky-600/20 flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang Lưu...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>Lưu Thay Đổi</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

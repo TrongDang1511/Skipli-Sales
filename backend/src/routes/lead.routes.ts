@@ -23,8 +23,11 @@ router.post('/', (req, res) => leadController.create(req, res));
 // 2. Lấy danh sách Leads (hỗ trợ lọc, tìm kiếm, phân trang và bảo mật RBAC)
 router.get('/', (req, res) => leadController.getLeads(req, res));
 
-// 3. Kiểm tra trùng số điện thoại thời gian thực (<20ms)
+// 3. Kiểm tra trùng số điện thoại (hỗ trợ cả 1 số và mảng phones[])
 router.post('/check-phone', (req, res) => leadController.checkPhone(req, res));
+
+// 3.1 Import hàng loạt Leads từ Excel (Sales: tự gán; Admin: Chưa phân công)
+router.post('/import', (req, res) => leadController.importLeads(req, res));
 
 // 4. Lấy chi tiết Lead theo ID
 router.get('/:id', (req, res) => leadController.getById(req, res));

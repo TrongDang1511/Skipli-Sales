@@ -400,7 +400,7 @@ export const SalesWorkspacePage: React.FC = () => {
                 Danh Sách Khách Hàng Tiềm Năng (Leads Của Tôi)
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Quản lý toàn bộ phễu bán hàng 7 trạng thái, tự động gán mã tiền tố [
+                Quản lý toàn bộ   bán hàng 7 trạng thái, tự động gán mã tiền tố [
                 <strong className="text-slate-700">{user?.salesPrefix || 'TR'}</strong>] và chống
                 trùng chéo 20ms
               </p>

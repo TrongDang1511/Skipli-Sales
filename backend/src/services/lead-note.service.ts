@@ -32,8 +32,28 @@ export class LeadNoteService {
     currentUser: NonNullable<AuthRequest['user']>
   ): Promise<LeadNote[]> {
     // Tái sử dụng getLeadById để chặn Sales xem trộm timeline quán của Sales khác
-    await this.leadService.getLeadById(leadId, currentUser);
-    return await this.noteRepo.findByLeadId(leadId);
+    const lead = await this.leadService.getLeadById(leadId, currentUser);
+    const notes = await this.noteRepo.findByLeadId(leadId);
+
+    // Tự động đồng bộ ghi chú ban đầu của các Lead cũ/vừa import vào lead_notes để không bị mất khi thêm note mới
+    const initialContent = (lead.latestNote || '').trim();
+    if (notes.length === 0 && initialContent !== '') {
+      const initialNote: LeadNote = {
+        id: 'note_' + crypto.randomUUID(),
+        leadId: lead.id,
+        authorId: lead.assignedTo || currentUser.id,
+        authorName: lead.assignedTo ? lead.assignedName : 'Ghi chú ban đầu',
+        authorPrefix: lead.assignedPrefix || lead.leadCustomId?.split('-')[0] || 'LD',
+        callResult: 'NOTE_ONLY',
+        content: initialContent,
+        nextCallDate: lead.nextCallDate || null,
+        createdAt: lead.createdAt || new Date().toISOString(),
+      };
+      await this.noteRepo.create(initialNote);
+      return [initialNote];
+    }
+
+    return notes;
   }
 
   /**

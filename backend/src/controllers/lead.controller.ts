@@ -12,6 +12,7 @@ import { LeadService } from '../services/lead.service';
 import { LeadNoteService } from '../services/lead-note.service';
 import {
   CreateLeadRequestSchema,
+  ImportLeadsRequestSchema,
   CreateLeadNoteRequestSchema,
   GetLeadsQuerySchema,
   UpdateLeadRequestSchema,
@@ -77,10 +78,28 @@ export class LeadController {
 
   /**
    * 3. KIỂM TRA TRÙNG SỐ ĐIỆN THOẠI (POST /api/leads/check-phone)
+   * Hỗ trợ cả kiểm tra 1 số ({ phone }) lẫn kiểm tra theo lô ({ phones[] }) cho Preview Excel
    */
   async checkPhone(req: AuthRequest, res: Response) {
     try {
-      const { phone } = req.body;
+      const { phone, phones } = req.body;
+
+      if (Array.isArray(phones)) {
+        if (phones.length === 0 || phones.length > 500) {
+          return res.status(400).json({
+            success: false,
+            message: 'Danh sách số điện thoại kiểm tra phải từ 1 đến 500 số!',
+          });
+        }
+        const batchResult = await leadService.checkPhonesBatch(
+          phones.map((item) => String(item ?? ''))
+        );
+        return res.status(200).json({
+          success: true,
+          data: batchResult,
+        });
+      }
+
       if (!phone) {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp số điện thoại cần kiểm tra!' });
       }
@@ -269,6 +288,32 @@ export class LeadController {
       return res.status(statusCode).json({
         success: false,
         message: err.message || 'Lưu ghi chú cuộc gọi thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 11. IMPORT HÀNG LOẠT LEADS TỪ EXCEL (POST /api/leads/import)
+   */
+  async importLeads(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+
+      const validated = ImportLeadsRequestSchema.parse(req.body);
+      const result = await leadService.importLeads(validated, req.user);
+
+      return res.status(201).json({
+        success: true,
+        message: `Đã import thành công ${result.importedCount} nhà hàng!`,
+        data: result,
+      });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Import danh sách nhà hàng thất bại!',
       });
     }
   }

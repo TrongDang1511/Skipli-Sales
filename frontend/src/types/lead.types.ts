@@ -7,7 +7,7 @@
  * ==============================================================================
  */
 
-// 1. 7 TRẠNG THÁI CHUẨN MỰC CỦA HỆ THỐNG PHỄU BÁN HÀNG
+// 1. 7 TRẠNG THÁI CHUẨN MỰC CỦA HỆ THỐNG   BÁN HÀNG
 export type LeadStatus =
   | 'NEW'              // Mới tạo, chưa gọi tiếp cận (Mặc định)
   | 'CALLING'          // Đang trong quy trình gọi tiếp cận
@@ -80,7 +80,7 @@ export interface Lead {
   ownerEmail: string;               // Email liên hệ của quán/chủ quán
   googleMapsUrl: string;            // Link Google Maps
   facebookUrl: string;              // Link Fanpage Facebook
-  status: LeadStatus;               // 1 trong 7 trạng thái phễu
+  status: LeadStatus;               // 1 trong 7 trạng thái  
   assignedTo: string;               // User ID của Sales phụ trách
   assignedPrefix: string;           // Tiền tố Sales (TR, SH, TC...)
   assignedName: string;             // Tên hiển thị của Sales phụ trách
@@ -93,6 +93,7 @@ export interface Lead {
   aiEvaluation?: string;            // Nhận xét đánh giá của AI
   createdAt: string;                // Ngày tạo (ISO string)
   updatedAt: string;                // Ngày cập nhật gần nhất (ISO string)
+  statusUpdatedAt?: string;         // Thời điểm đổi trạng thái   gần nhất (ISO string)
 }
 
 // 4. DTO ĐẦU VÀO FORM TẠO LEAD MỚI (QUICK ADD LEAD FORM)
@@ -203,6 +204,28 @@ export const CALL_RESULT_CONFIG: Record<
   VOICEMAIL: { label: 'Hộp thư thoại', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   NOTE_ONLY: { label: 'Ghi chú', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
+
+// 8.2 IMPORT LEADS TỪ EXCEL (PREVIEW & KẾT QUẢ BATCH)
+export type ImportRowStatus = 'VALID' | 'INVALID' | 'DUPLICATE_IN_FILE' | 'DUPLICATE_IN_DB';
+
+export interface ImportLeadPreviewItem extends CreateLeadInput {
+  rowNumber: number;
+  status: ImportRowStatus;
+  errorMessage?: string;
+  duplicateInfo?: string;
+}
+
+export interface ImportLeadsResult {
+  importedCount: number;
+  skippedDuplicateCount: number;
+  skippedInvalidCount: number;
+  skippedDetails: Array<{
+    rowNumber: number;
+    restaurantName: string;
+    hotline: string;
+    reason: string;
+  }>;
+}
 
 // 9. BẢNG CẤU HÌNH GIAO DIỆN VÀ METADATA CHO 7 TRẠNG THÁI (SINGLE SOURCE OF TRUTH)
 export const LEAD_STATUS_CONFIG: Record<
