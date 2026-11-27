@@ -23,6 +23,10 @@ router.post('/', (req, res) => leadController.create(req, res));
 // 2. Lấy danh sách Leads (hỗ trợ lọc, tìm kiếm, phân trang và bảo mật RBAC)
 router.get('/', (req, res) => leadController.getLeads(req, res));
 
+// 2.1 Thống kê dữ liệu thật cho Admin & Sales Dashboard (đặt trước /:id)
+router.get('/admin-dashboard', (req, res) => leadController.getAdminDashboard(req, res));
+router.get('/sales-dashboard', (req, res) => leadController.getSalesDashboard(req, res));
+
 // 3. Kiểm tra trùng số điện thoại (hỗ trợ cả 1 số và mảng phones[])
 router.post('/check-phone', (req, res) => leadController.checkPhone(req, res));
 

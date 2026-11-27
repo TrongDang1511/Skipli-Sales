@@ -629,4 +629,339 @@ export class LeadService {
     const updatedCount = await this.leadRepo.bulkUpdate(leadIds, updates);
     return { updatedCount };
   }
+
+  private resolvePeriodContext(period: 'today' | '7d' | '30d' | 'all', todayDate: string) {
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(todayDate)
+      ? todayDate
+      : new Date().toISOString().slice(0, 10);
+
+    let startDateStr: string | null = null;
+    if (period === 'today') {
+      startDateStr = today;
+    } else if (period === '7d' || period === '30d') {
+      const base = new Date(`${today}T00:00:00Z`);
+      base.setUTCDate(base.getUTCDate() - (period === '7d' ? 6 : 29));
+      startDateStr = base.toISOString().slice(0, 10);
+    }
+
+    const inPeriod = (iso?: string | null): boolean => {
+      if (!startDateStr) return true;
+      if (!iso) return false;
+      return iso.slice(0, 10) >= startDateStr;
+    };
+
+    return { today, startDateStr, inPeriod };
+  }
+
+  /**
+   * 9. THỐNG KÊ DỮ LIỆU THẬT CHO ADMIN DASHBOARD (/api/leads/admin-dashboard)
+   */
+  async getAdminDashboard(
+    period: 'today' | '7d' | '30d' | 'all',
+    todayDate: string,
+    currentUser: NonNullable<AuthRequest['user']>
+  ) {
+    if (currentUser.role !== 'ADMIN') {
+      throw new Error('Chỉ Quản trị viên (Admin) mới có quyền xem Dashboard toàn công ty!');
+    }
+
+    const { today, inPeriod } = this.resolvePeriodContext(period, todayDate);
+
+    const [allLeads, allNotes, allUsers] = await Promise.all([
+      this.leadRepo.findAll(),
+      this.noteRepo.findAll(),
+      this.userRepo.findAll(),
+    ]);
+
+    const followUpSet = new Set<LeadStatus>(['CALLING', 'LOW_INTERESTED', 'HIGH_INTERESTED', 'HOT_LEAD']);
+
+    // 1. KPI Won trong kỳ + Pipeline, Chưa phân công & Quá hạn hiện tại
+    const wonLeadsInPeriod = allLeads.filter(
+      (l) => l.status === 'WON' && inPeriod(l.statusUpdatedAt || l.updatedAt)
+    );
+    const wonRevenue = wonLeadsInPeriod.reduce((sum, l) => sum + (Number(l.dealValue) || 0), 0);
+    const wonCount = wonLeadsInPeriod.length;
+
+    const newCount = allLeads.filter((l) => l.status === 'NEW').length;
+    const followUpLeads = allLeads.filter((l) => followUpSet.has(l.status));
+    const hotLeadCount = allLeads.filter((l) => l.status === 'HOT_LEAD').length;
+    const pipelineTotal = newCount + followUpLeads.length;
+
+    const unassignedLeads = allLeads.filter(
+      (l) => !l.assignedTo || l.assignedTo.trim() === '' || l.assignedTo === 'UNASSIGNED'
+    );
+    const overdueFollowUps = followUpLeads.filter(
+      (l) => l.nextCallDate && l.nextCallDate.slice(0, 10) < today
+    );
+
+    // 2. Cuộc gọi thực tế trong kỳ (từ lead_notes, loại trừ NOTE_ONLY)
+    const callNotesInPeriod = allNotes.filter(
+      (n) => n.callResult !== 'NOTE_ONLY' && inPeriod(n.createdAt)
+    );
+    const totalCalls = callNotesInPeriod.length;
+    const answeredCount = callNotesInPeriod.filter((n) => n.callResult === 'ANSWERED').length;
+    const answeredRate = totalCalls > 0 ? Math.round((answeredCount / totalCalls) * 100) : 0;
+
+    // 3.    7 trạng thái hiện tại + % chuyển đổi từ tầng trước
+    const funnelOrder: Array<{ status: LeadStatus; label: string }> = [
+      { status: 'NEW', label: 'New' },
+      { status: 'CALLING', label: 'Calling' },
+      { status: 'LOW_INTERESTED', label: 'Low Interest' },
+      { status: 'HIGH_INTERESTED', label: 'High Interest' },
+      { status: 'HOT_LEAD', label: 'Hot Lead' },
+      { status: 'WON', label: 'Won' },
+      { status: 'LOST', label: 'Lost' },
+    ];
+    const statusCounts: Record<string, number> = {};
+    allLeads.forEach((l) => {
+      statusCounts[l.status] = (statusCounts[l.status] || 0) + 1;
+    });
+    const funnel = funnelOrder.map((item, idx) => {
+      const count = statusCounts[item.status] || 0;
+      const prevCount = idx > 0 ? statusCounts[funnelOrder[idx - 1].status] || 0 : 0;
+      const conversionFromPrev =
+        idx === 0 ? 100 : prevCount > 0 ? Math.round((count / prevCount) * 100) : 0;
+      return {
+        status: item.status,
+        label: item.label,
+        count,
+        conversionFromPrev,
+      };
+    });
+
+    // 4. Cơ cấu kết quả cuộc gọi (5 loại)
+    const outcomeOrder = [
+      { key: 'ANSWERED', label: 'Nghe máy' },
+      { key: 'CALLBACK', label: 'Hẹn gọi lại' },
+      { key: 'NO_ANSWER', label: 'Không bắt máy' },
+      { key: 'VOICEMAIL', label: 'Hộp thư thoại' },
+      { key: 'BUSY', label: 'Máy bận' },
+    ] as const;
+    const callOutcomes = outcomeOrder.map((o) => {
+      const count = callNotesInPeriod.filter((n) => n.callResult === o.key).length;
+      return {
+        key: o.key,
+        label: o.label,
+        count,
+        percent: totalCalls > 0 ? Math.round((count / totalCalls) * 100) : 0,
+      };
+    });
+
+    // 5. Hiệu suất theo từng Sales (ACTIVE)
+    const activeSales = allUsers.filter((u) => u.role === 'SALES' && u.isActive);
+    const salesPerformance = activeSales
+      .map((s) => {
+        const calls = callNotesInPeriod.filter((n) => n.authorId === s.id).length;
+        const sWon = wonLeadsInPeriod.filter((l) => l.assignedTo === s.id);
+        const sOverdue = overdueFollowUps.filter((l) => l.assignedTo === s.id).length;
+        const sActive = allLeads.filter(
+          (l) => l.assignedTo === s.id && (l.status === 'NEW' || followUpSet.has(l.status))
+        ).length;
+        const prefix = s.salesPrefix || 'SR';
+        return {
+          salesId: s.id,
+          salesPrefix: prefix,
+          fullName: s.fullName,
+          displayLabel: `[${prefix}] ${s.fullName}`,
+          calls,
+          wonCount: sWon.length,
+          wonRevenue: sWon.reduce((sum, l) => sum + (Number(l.dealValue) || 0), 0),
+          overdueCount: sOverdue,
+          activeLeads: sActive,
+        };
+      })
+      .sort((a, b) => b.wonCount - a.wonCount || b.calls - a.calls);
+
+    // 6. Phân nhóm lý do LOST trong kỳ
+    const lostLeadsInPeriod = allLeads.filter(
+      (l) => l.status === 'LOST' && inPeriod(l.statusUpdatedAt || l.updatedAt)
+    );
+    const lostMap = new Map<string, number>();
+    lostLeadsInPeriod.forEach((l) => {
+      const reason = (l.lostReason || '').trim() || 'Chưa ghi nhận lý do';
+      lostMap.set(reason, (lostMap.get(reason) || 0) + 1);
+    });
+    const lostReasons = Array.from(lostMap.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // 7. Action Queue: Kho chưa phân công & Lead Hot bị bỏ quên
+    const unassignedQueue = unassignedLeads
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 8)
+      .map((l) => ({
+        id: l.id,
+        leadCustomId: l.leadCustomId,
+        restaurantName: l.restaurantName,
+        state: l.state,
+        hotline: l.hotline,
+        createdAt: l.createdAt,
+      }));
+
+    const staleCutoff = new Date(`${today}T00:00:00Z`);
+    staleCutoff.setUTCDate(staleCutoff.getUTCDate() - 3);
+    const staleDateStr = staleCutoff.toISOString().slice(0, 10);
+
+    const neglectedHotLeads = allLeads
+      .filter((l) => {
+        if (l.status !== 'HOT_LEAD' && l.status !== 'HIGH_INTERESTED') return false;
+        const isOverdue = Boolean(l.nextCallDate && l.nextCallDate.slice(0, 10) < today);
+        const noSchedule = !l.nextCallDate;
+        const oldLastCall = Boolean(l.lastCallDate && l.lastCallDate.slice(0, 10) <= staleDateStr);
+        return isOverdue || noSchedule || oldLastCall;
+      })
+      .sort((a, b) => (a.status === 'HOT_LEAD' ? -1 : 1) - (b.status === 'HOT_LEAD' ? -1 : 1))
+      .slice(0, 8)
+      .map((l) => ({
+        id: l.id,
+        leadCustomId: l.leadCustomId,
+        restaurantName: l.restaurantName,
+        status: l.status,
+        assignedName: l.assignedName || 'Chưa phân công',
+        assignedPrefix: l.assignedPrefix || '',
+        nextCallDate: l.nextCallDate || null,
+        lastCallDate: l.lastCallDate || null,
+      }));
+
+    return {
+      period,
+      today,
+      kpis: {
+        wonRevenue,
+        wonCount,
+        pipelineTotal,
+        newCount,
+        followUpCount: followUpLeads.length,
+        hotLeadCount,
+        unassignedCount: unassignedLeads.length,
+        overdueCount: overdueFollowUps.length,
+        totalCalls,
+        answeredCount,
+        answeredRate,
+      },
+      funnel,
+      callOutcomes,
+      salesPerformance,
+      lostReasons,
+      actionQueue: {
+        unassignedQueue,
+        neglectedHotLeads,
+      },
+    };
+  }
+
+  /**
+   * 10. THỐNG KÊ DỮ LIỆU THẬT CHO SALES DASHBOARD (/api/leads/sales-dashboard)
+   */
+  async getSalesDashboard(
+    period: 'today' | '7d' | '30d' | 'all',
+    todayDate: string,
+    currentUser: NonNullable<AuthRequest['user']>
+  ) {
+    const { today, inPeriod } = this.resolvePeriodContext(period, todayDate);
+    const [allLeads, allNotes] = await Promise.all([
+      this.leadRepo.findAll(),
+      this.noteRepo.findAll(),
+    ]);
+
+    const myLeads = allLeads.filter((l) => l.assignedTo === currentUser.id);
+    const myCallNotes = allNotes.filter(
+      (n) => n.authorId === currentUser.id && n.callResult !== 'NOTE_ONLY'
+    );
+
+    const followUpSet = new Set<LeadStatus>(['CALLING', 'LOW_INTERESTED', 'HIGH_INTERESTED', 'HOT_LEAD']);
+    const myNewLeads = myLeads.filter((l) => l.status === 'NEW');
+    const myFollowUpLeads = myLeads.filter((l) => followUpSet.has(l.status));
+
+    const dueTodayFollowUps = myFollowUpLeads.filter(
+      (l) => l.nextCallDate && l.nextCallDate.slice(0, 10) === today
+    );
+    const overdueLeads = myFollowUpLeads.filter(
+      (l) => l.nextCallDate && l.nextCallDate.slice(0, 10) < today
+    );
+
+    const todayCallsCount = myCallNotes.filter((n) => n.createdAt.slice(0, 10) === today).length;
+    const wonInPeriod = myLeads.filter(
+      (l) => l.status === 'WON' && inPeriod(l.statusUpdatedAt || l.updatedAt)
+    );
+    const wonRevenue = wonInPeriod.reduce((sum, l) => sum + (Number(l.dealValue) || 0), 0);
+
+    // Biểu đồ 1: Nhịp gọi & Chốt/Hot theo ngày (7 ngày gần nhất hoặc 14/30 ngày theo kỳ)
+    const chartDays = period === 'today' ? 1 : period === '30d' || period === 'all' ? 14 : 7;
+    const dailyActivity: Array<{
+      date: string;
+      label: string;
+      calls: number;
+      hotOrWon: number;
+    }> = [];
+
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const d = new Date(`${today}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const label = `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`;
+
+      const calls = myCallNotes.filter((n) => n.createdAt.slice(0, 10) === dateStr).length;
+      const hotOrWon = myLeads.filter((l) => {
+        if (l.status !== 'HOT_LEAD' && l.status !== 'WON') return false;
+        const ts = (l.statusUpdatedAt || l.updatedAt || '').slice(0, 10);
+        return ts === dateStr;
+      }).length;
+
+      dailyActivity.push({ date: dateStr, label, calls, hotOrWon });
+    }
+
+    // Biểu đồ 2: Phân bổ 5 trạng thái đang bám
+    const activeStatuses: Array<{ status: LeadStatus; label: string }> = [
+      { status: 'NEW', label: 'New' },
+      { status: 'CALLING', label: 'Calling' },
+      { status: 'LOW_INTERESTED', label: 'Low Interest' },
+      { status: 'HIGH_INTERESTED', label: 'High Interest' },
+      { status: 'HOT_LEAD', label: 'Hot Lead' },
+    ];
+    const statusBreakdown = activeStatuses.map((item) => ({
+      status: item.status,
+      label: item.label,
+      count: myLeads.filter((l) => l.status === item.status).length,
+    }));
+
+    // Hàng đợi gọi điện ưu tiên trong ngày: HOT quá hạn/hôm nay -> HIGH -> CALLING/LOW -> NEW
+    const priorityRank = (l: Lead): number => {
+      const isOverdue = Boolean(l.nextCallDate && l.nextCallDate.slice(0, 10) < today);
+      if (l.status === 'HOT_LEAD') return isOverdue ? 1 : 2;
+      if (l.status === 'HIGH_INTERESTED') return isOverdue ? 3 : 4;
+      if (followUpSet.has(l.status)) return isOverdue ? 5 : 6;
+      return 7; // NEW
+    };
+
+    const callQueue = myLeads
+      .filter((l) => {
+        if (l.status === 'NEW') return true;
+        if (followUpSet.has(l.status)) {
+          return Boolean(l.nextCallDate && l.nextCallDate.slice(0, 10) <= today);
+        }
+        return false;
+      })
+      .sort((a, b) => priorityRank(a) - priorityRank(b))
+      .slice(0, 12);
+
+    return {
+      period,
+      today,
+      kpis: {
+        dueTodayCount: dueTodayFollowUps.length + myNewLeads.length,
+        followUpTodayCount: dueTodayFollowUps.length,
+        newAssignedCount: myNewLeads.length,
+        overdueCount: overdueLeads.length,
+        todayCallsCount,
+        dailyCallTarget: 20,
+        wonCount: wonInPeriod.length,
+        wonRevenue,
+      },
+      dailyActivity,
+      statusBreakdown,
+      callQueue,
+    };
+  }
 }

@@ -151,6 +151,14 @@ export class LeadRepository {
   }
 
   /**
+   * 4.1 LẤY TOÀN BỘ LEADS (PHỤC VỤ THỐNG KÊ DASHBOARD)
+   */
+  async findAll(): Promise<Lead[]> {
+    const snapshot = await this.getDb().collection(this.collectionName).get();
+    return snapshot.docs.map((doc) => doc.data() as Lead);
+  }
+
+  /**
    * 5. TRUY VẤN DANH SÁCH LEADS CÓ LỌC, TÌM KIẾM, CHIA SHEET VÀ PHÂN TRANG
    */
   async findLeads(options: {
