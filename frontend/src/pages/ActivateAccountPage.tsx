@@ -4,6 +4,7 @@ import { authApi } from '../services/auth.api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { AuthLayout } from '../components/auth/AuthLayout';
+import { getPasswordStrength } from '@/lib/utils';
 import { User, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldAlert, ArrowLeft, ArrowRight } from 'lucide-react';
 
 export const ActivateAccountPage: React.FC = () => {
@@ -20,16 +21,7 @@ export const ActivateAccountPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Tính toán độ mạnh mật khẩu (Password Strength Score: 0 đến 3)
-  const getPasswordStrength = () => {
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
-    if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) score++;
-    return score;
-  };
-
-  const strength = getPasswordStrength();
+  const strength = getPasswordStrength(password, 8);
   const isMatch = password && confirmPassword && password === confirmPassword;
 
   // Nếu không có token trên URL

@@ -3,6 +3,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { LoginPage } from './pages/LoginPage';
 import { ActivateAccountPage } from './pages/ActivateAccountPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { SalesWorkspacePage } from './pages/SalesWorkspacePage';
@@ -30,6 +32,24 @@ export default function App() {
 
             {/* Tuyến Đường Kích Hoạt Tài Khoản: Dành cho Sales mới bấm từ link email Brevo */}
             <Route path="/activate" element={<ActivateAccountPage />} />
+
+            {/* Tuyến Đường Quên & Đặt Lại Mật Khẩu */}
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicOnlyRoute>
+                  <ForgotPasswordPage />
+                </PublicOnlyRoute>
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={
+                <PublicOnlyRoute>
+                  <ResetPasswordPage />
+                </PublicOnlyRoute>
+              }
+            />
 
             {/* Tuyến Đường Phân Hệ Quản Trị Viên (Admin) - Chia Route & Header Độc Lập */}
             <Route

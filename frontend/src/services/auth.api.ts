@@ -102,4 +102,16 @@ export const authApi = {
     const res = await api.delete(`/users/${userId}`);
     return res.data;
   },
+
+  // 10. Gửi yêu cầu quên mật khẩu (POST /api/auth/forgot-password)
+  forgotPassword: async (email: string) => {
+    const res = await api.post('/auth/forgot-password', { email });
+    return res.data;
+  },
+
+  // 11. Đặt lại mật khẩu mới từ link email (POST /api/auth/reset-password)
+  resetPassword: async (data: { token: string; password: string }) => {
+    const res = await api.post('/auth/reset-password', data);
+    return res.data;
+  },
 };

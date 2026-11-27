@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { AuthLayout } from '../components/auth/AuthLayout';
@@ -88,12 +88,12 @@ export const LoginPage: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="block text-xs font-semibold text-slate-700">Mật Khẩu</label>
-            <a
-              href="#forgot"
+            <Link
+              to="/forgot-password"
               className="text-xs font-medium text-sky-600 hover:text-sky-700 hover:underline"
             >
               Quên mật khẩu?
-            </a>
+            </Link>
           </div>
           <div className="relative">
             <input
