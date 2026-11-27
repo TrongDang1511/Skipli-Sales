@@ -1,341 +1,643 @@
-import React, { useState } from 'react';
+/**
+ * ==============================================================================
+ * DỰ ÁN: SKIPLI SALES INTERNAL CRM
+ * FILE: frontend/src/pages/AdminDashboardPage.tsx
+ * PHÂN LOẠI: PAGE COMPONENT (ADMIN DASHBOARD - DỮ LIỆU THẬT 100%)
+ * VAI TRÒ: Tổng Quan Doanh Thu, Phễu 7 Trạng Thái, Kết Quả Cuộc Gọi, Hiệu Suất Sales & Action Queue
+ * ==============================================================================
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  LabelList,
+} from 'recharts';
+import {
+  DollarSign,
+  Flame,
+  AlertTriangle,
   PhoneCall,
-  ArrowRight,
-  Bell,
-  Calendar,
-  Download,
-  Building2,
-  TrendingUp,
-  ChevronDown,
   RefreshCw,
+  ArrowRight,
+  Loader2,
+  UserX,
+  Clock,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import { getLocalDateString } from '@/lib/utils';
+import { leadApi, extractApiErrorMessage } from '../services/lead.api';
+import { AdminDashboardResponse, DashboardPeriod } from '../types/lead.types';
 import { useToast } from '../contexts/ToastContext';
 
+const PERIOD_OPTIONS: Array<{ value: DashboardPeriod; label: string }> = [
+  { value: 'today', label: 'Hôm nay' },
+  { value: '7d', label: '7 ngày' },
+  { value: '30d', label: '30 ngày' },
+  { value: 'all', label: 'Tất cả' },
+];
+
+const FUNNEL_COLORS: Record<string, string> = {
+  NEW: '#0284c7',
+  CALLING: '#0ea5e9',
+  LOW_INTERESTED: '#f59e0b',
+  HIGH_INTERESTED: '#6366f1',
+  HOT_LEAD: '#e11d48',
+  WON: '#10b981',
+  LOST: '#94a3b8',
+};
+
+const OUTCOME_COLORS: Record<string, string> = {
+  ANSWERED: '#10b981',
+  CALLBACK: '#0ea5e9',
+  NO_ANSWER: '#f59e0b',
+  VOICEMAIL: '#6366f1',
+  BUSY: '#f97316',
+};
+
+const funnelChartConfig: ChartConfig = {
+  count: { label: 'Số Lead', color: '#0284c7' },
+};
+
+const outcomeChartConfig: ChartConfig = {
+  ANSWERED: { label: 'Nghe máy', color: '#10b981' },
+  CALLBACK: { label: 'Hẹn gọi lại', color: '#0ea5e9' },
+  NO_ANSWER: { label: 'Không bắt máy', color: '#f59e0b' },
+  VOICEMAIL: { label: 'Hộp thư thoại', color: '#6366f1' },
+  BUSY: { label: 'Máy bận', color: '#f97316' },
+};
+
+const salesChartConfig: ChartConfig = {
+  calls: { label: 'Cuộc gọi', color: '#0284c7' },
+  wonCount: { label: 'Deal Won', color: '#10b981' },
+};
+
+const lostChartConfig: ChartConfig = {
+  count: { label: 'Lead Lost', color: '#f43f5e' },
+};
+
 export const AdminDashboardPage: React.FC = () => {
-  const { user } = useAuth();
-  const toast = useToast();
   const navigate = useNavigate();
+  const toast = useToast();
+  const today = getLocalDateString();
 
-  const [selectedYear, setSelectedYear] = useState('2026');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [period, setPeriod] = useState<DashboardPeriod>('30d');
+  const [data, setData] = useState<AdminDashboardResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success('Dữ liệu chỉ số doanh số & Leads nhà hàng đã được cập nhật mới nhất!');
-    }, 600);
-  };
+  const loadDashboard = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await leadApi.getAdminDashboard(period, today);
+      setData(res);
+    } catch (err: any) {
+      toast.error(extractApiErrorMessage(err, 'Không tải được dữ liệu Dashboard!'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [period, today]);
 
-  // Dữ liệu biểu đồ cột xếp chồng 12 tháng (Stacked Bar Chart: AI Calls vs Demos)
-  const monthlyChartData = [
-    { month: 'T1', calls: 65, demos: 20 },
-    { month: 'T2', calls: 80, demos: 28 },
-    { month: 'T3', calls: 110, demos: 38 },
-    { month: 'T4', calls: 95, demos: 34 },
-    { month: 'T5', calls: 125, demos: 48 },
-    { month: 'T6', calls: 140, demos: 54 },
-    { month: 'T7', calls: 115, demos: 40 },
-    { month: 'T8', calls: 130, demos: 45 },
-    { month: 'T9', calls: 145, demos: 52 },
-    { month: 'T10', calls: 160, demos: 62 },
-    { month: 'T11', calls: 185, demos: 78 }, // Tháng hiện tại
-    { month: 'T12', calls: 110, demos: 36 },
-  ];
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const funnelData =
+    data?.funnel.map((item, idx) => ({
+      ...item,
+      displayLabel:
+        idx === 0 ? `${item.count}` : `${item.count} (${item.conversionFromPrev}%)`,
+      fill: FUNNEL_COLORS[item.status] || '#0284c7',
+    })) || [];
 
   return (
-    <>
-      {/* ======================================================================= */}
-      {/* HEADER RIÊNG CỦA ROUTE TỔNG QUAN DOANH SỐ (ADMIN DASHBOARD)             */}
-      {/* ======================================================================= */}
+    <div className="flex-1 flex flex-col min-w-0 bg-[#FAF8F5]">
+      {/* HEADER */}
       <header className="bg-white border-b border-slate-200/80 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-20 shadow-2xs">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-0.5">
             <span>Bàn Làm Việc</span>
             <span>/</span>
-            <span className="text-slate-600 font-semibold">Tổng Quan Doanh Số</span>
+            <span className="text-slate-600 font-semibold">Dashboard Quản Trị</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Tổng Quan Doanh Số
+            Tổng Quan Kinh Doanh
           </h1>
         </div>
 
-        {/* Cụm Điều Khiển Bên Phải */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Bộ Lọc Ngày */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#FAF8F5] border border-slate-200 text-xs text-slate-700 shadow-2xs font-medium">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>01 Th11 - 19 Th11, 2026</span>
+        {/* Bộ lọc kỳ & Làm mới */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200/80">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setPeriod(opt.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  period === opt.value
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
 
-          {/* Nút Xuất Báo Cáo Dropdown */}
-          <button
+          <Button
             type="button"
-            onClick={() => toast.success('Đã xuất báo cáo thống kê doanh số PDF/Excel thành công.')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 shadow-2xs font-medium hover:bg-slate-50 transition-colors"
+            variant="outline"
+            size="sm"
+            onClick={loadDashboard}
+            disabled={isLoading}
+            className="rounded-xl border-slate-200 bg-white text-xs font-bold gap-1.5 h-9"
           >
-            <Download className="w-3.5 h-3.5 text-slate-400" />
-            <span>Xuất Dữ Liệu</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
-
-          <div className="h-5 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-
-          {/* Nút Làm Mới Dữ Liệu */}
-          <button
-            type="button"
-            onClick={handleRefresh}
-            title="Làm mới dữ liệu từ máy chủ"
-            className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-sky-600' : ''}`} />
-          </button>
-
-          {/* Nút Thông Báo Bell */}
-          <button
-            type="button"
-            onClick={() => toast.success('Hệ thống AI đang gọi bình thường. Không có cảnh báo.')}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-50 transition-colors relative"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-1.5 right-1.5 ring-2 ring-white" />
-          </button>
-
-          {/* Avatar Mini Admin */}
-          <div className="w-8 h-8 rounded-full bg-[#071E3D] text-white font-bold text-xs flex items-center justify-center border border-slate-200 shadow-2xs">
-            {user?.salesPrefix || 'SH'}
-          </div>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
+            <span>Làm mới</span>
+          </Button>
         </div>
       </header>
 
-      {/* ======================================================================= */}
-      {/* NỘI DUNG CHÍNH: DASHBOARD TRẢI RỘNG TOÀN CHIỀU NGANG                   */}
-      {/* ======================================================================= */}
+      {/* MAIN CONTENT */}
       <main className="p-6 sm:p-8 space-y-6">
-        {/* 1. CỤM 4 THẺ KPI TOÀN BỘ CHIỀU NGANG */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Doanh Thu Dự Kiến */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">
-                Doanh Thu Dự Kiến (T11)
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-bold text-[11px] flex items-center gap-0.5">
-                  <TrendingUp className="w-3 h-3 text-emerald-600" />
-                  +18.4%
-                </span>
-                <div className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
-                  <ArrowRight className="w-3.5 h-3.5 -rotate-45" />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                $42,850
-                <span className="text-xs font-normal text-slate-400 ml-1.5 whitespace-nowrap">/ $58,000</span>
-              </div>
-              <span className="text-xs text-slate-400 font-medium whitespace-nowrap shrink-0">Còn 11 ngày</span>
-            </div>
-
-            {/* Thanh Tiến Độ Hoàn Thành Target */}
-            <div className="space-y-1.5 pt-1">
-              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/60">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-sky-600 to-sky-400 transition-all duration-1000 shadow-xs"
-                  style={{ width: '74%' }}
-                />
-              </div>
-              <div className="flex justify-between text-[11px] text-slate-500">
-                <span>Tiến độ đạt 74%</span>
-                <span className="font-semibold text-sky-700">Mục tiêu: 50 Nhà Hàng</span>
-              </div>
-            </div>
+        {isLoading && !data ? (
+          <div className="py-24 text-center text-slate-400 text-xs">
+            <Loader2 className="w-7 h-7 animate-spin mx-auto text-sky-600 mb-2" />
+            <p className="font-semibold text-slate-600">Đang tải dữ liệu...</p>
           </div>
+        ) : data ? (
+          <>
+            {/* HÀNG 1: 4 THẺ KPI NGẮN GỌN */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardContent className="p-5 flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      DOANH THU WON
+                    </span>
+                    <div className="text-2xl font-black text-emerald-600 font-mono">
+                      ${data.kpis.wonRevenue.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      <strong className="text-slate-800">{data.kpis.wonCount}</strong> deal chốt
+                    </div>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* KPI 2: Tổng Nhân Sự Sales */}
-          <div
-            onClick={() => navigate('/users')}
-            className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3 cursor-pointer hover:border-sky-300 transition-all group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 group-hover:text-sky-700 transition-colors">
-                Đội Ngũ Sales
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-[#071E3D] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                <Users className="w-4 h-4 text-sky-300" />
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                4 nhân sự
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                100% Đang hoạt động
-              </div>
-            </div>
-            <div className="text-[11px] text-slate-400 border-t border-slate-100 pt-1.5 flex items-center justify-between">
-              <span>Phân bổ đủ tiền tố Leads</span>
-              <span className="text-sky-600 font-semibold">Xem danh sách →</span>
-            </div>
-          </div>
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardContent className="p-5 flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      LEAD ĐANG MỞ
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {data.kpis.pipelineTotal.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 flex-wrap">
+                      <span>{data.kpis.newCount} New</span>
+                      <span>•</span>
+                      <span>{data.kpis.followUpCount} Follow-Up</span>
+                      <span>•</span>
+                      <span className="text-rose-600 font-bold">{data.kpis.hotLeadCount} Hot</span>
+                    </div>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <Flame className="w-5 h-5" />
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* KPI 3: Cuộc Gọi AI Nhà Hàng */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Cuộc Gọi AI Tự Động</span>
-              <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100 shadow-2xs">
-                <PhoneCall className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                1,248 cuộc
-              </div>
-              <div className="text-[11px] text-emerald-700 font-semibold mt-1">
-                ↑ Tăng 24% so với tuần trước
-              </div>
-            </div>
-            <div className="text-[11px] text-slate-400 border-t border-slate-100 pt-1.5 flex items-center justify-between">
-              <span>Tỷ lệ chủ quán nghe: 68%</span>
-              <span className="text-emerald-600 font-semibold">Bot 24/7</span>
-            </div>
-          </div>
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardContent className="p-5 flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      CHƯA GIAO & QUÁ HẠN
+                    </span>
+                    <div className="text-2xl font-black text-amber-600">
+                      {data.kpis.unassignedCount}{' '}
+                      <span className="text-sm font-bold text-slate-400">/</span>{' '}
+                      <span className="text-rose-600">{data.kpis.overdueCount}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      {data.kpis.unassignedCount} chưa giao •{' '}
+                      <span className="text-rose-600 font-semibold">{data.kpis.overdueCount} quá hạn</span>
+                    </div>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* KPI 4: Leads Nhà Hàng Mới */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Leads Nhà Hàng Mới</span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shadow-2xs">
-                <Building2 className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                86 nhà hàng
-              </div>
-              <div className="text-[11px] text-sky-700 font-semibold mt-1">
-                California, Texas, New York
-              </div>
-            </div>
-            <div className="text-[11px] text-slate-400 border-t border-slate-100 pt-1.5 flex items-center justify-between">
-              <span>Đã phân bổ cho 4 Sales</span>
-              <span className="text-emerald-600 font-semibold">100% Leads sạch</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. BIỂU ĐỒ CỘT XẾP CHỒNG 12 THÁNG TRẢI RỘNG TOÀN CHIỀU NGANG */}
-        <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base tracking-tight">
-                Hiệu Suất Tiếp Cận & Đặt Lịch Demo (Revenue Overview)
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                So sánh số cuộc gọi AI tự động tiếp cận vs Số lịch hẹn Demo nhà hàng chốt được của toàn đội ngũ
-              </p>
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardContent className="p-5 flex items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      TỔNG CUỘC GỌI
+                    </span>
+                    <div className="text-2xl font-black text-sky-600">
+                      {data.kpis.totalCalls.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      Nghe máy: <strong className="text-emerald-700">{data.kpis.answeredRate}%</strong> ({data.kpis.answeredCount})
+                    </div>
+                  </div>
+                  <div className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                    <PhoneCall className="w-5 h-5" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-[#071E3D]" />
-                  <span className="text-slate-600">Cuộc gọi AI</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-sky-500" />
-                  <span className="text-slate-600">Hẹn Demo</span>
-                </div>
-              </div>
-
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 bg-[#FAF8F5] text-slate-700 font-bold focus:outline-none"
-              >
-                <option value="2026">Năm 2026</option>
-                <option value="2025">Năm 2025</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Vùng Vẽ Biểu Đồ Cột Xếp Chồng */}
-          <div className="pt-4 pb-2">
-            <div className="h-64 w-full flex items-end justify-between gap-2 sm:gap-4 px-2 border-b border-slate-100">
-              {monthlyChartData.map((item, idx) => {
-                const maxVal = 240;
-                const demoHeightPercent = (item.demos / maxVal) * 100;
-                const callHeightPercent = (item.calls / maxVal) * 100;
-                const isCurrent = idx === 10;
-
-                return (
-                  <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div className="w-full flex flex-col justify-end items-center h-52 relative">
-                      {/* Tooltip khi hover */}
-                      <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] rounded-lg px-2 py-1 pointer-events-none whitespace-nowrap shadow-md z-10">
-                        {item.month}: {item.calls} Cuộc gọi • {item.demos} Demo
-                      </div>
-
-                      <div
-                        className="w-full max-w-[36px] flex flex-col rounded-t-lg overflow-hidden transition-all duration-300 group-hover:opacity-90 shadow-2xs"
-                        style={{ height: `${demoHeightPercent + callHeightPercent}%` }}
-                      >
-                        <div
-                          style={{ height: `${(item.calls / (item.calls + item.demos)) * 100}%` }}
-                          className={isCurrent ? 'bg-[#071E3D]' : 'bg-[#1E3A8A]'}
-                          title={`Cuộc gọi AI: ${item.calls}`}
+            {/* HÀNG 2: PHỄU 7 TRẠNG THÁI (7 CỘT) & KẾT QUẢ CUỘC GỌI (5 CỘT) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <Card className="lg:col-span-7 rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black text-slate-900">
+                    Phễu 7 Trạng Thái
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={funnelChartConfig} className="h-[270px] w-full">
+                    <BarChart
+                      data={funnelData}
+                      layout="vertical"
+                      margin={{ top: 4, right: 64, left: 10, bottom: 4 }}
+                    >
+                      <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis
+                        dataKey="label"
+                        type="category"
+                        tickLine={false}
+                        axisLine={false}
+                        width={96}
+                        tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }}
+                      />
+                      <ChartTooltip
+                        cursor={{ fill: 'rgba(14, 165, 233, 0.08)' }}
+                        content={
+                          <ChartTooltipContent className="bg-white border-slate-200 shadow-lg rounded-xl text-slate-800" />
+                        }
+                      />
+                      <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={22}>
+                        {funnelData.map((entry) => (
+                          <Cell key={entry.status} fill={entry.fill} />
+                        ))}
+                        <LabelList
+                          dataKey="displayLabel"
+                          position="right"
+                          style={{ fontSize: 11, fontWeight: 700, fill: '#334155' }}
                         />
-                        <div
-                          style={{ height: `${(item.demos / (item.calls + item.demos)) * 100}%` }}
-                          className={isCurrent ? 'bg-sky-500' : 'bg-sky-400'}
-                          title={`Lịch demo chốt: ${item.demos}`}
-                        />
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-5 rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black text-slate-900">
+                    Kết Quả Cuộc Gọi
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {data.kpis.totalCalls === 0 ? (
+                    <div className="h-[270px] flex items-center justify-center text-xs text-slate-400 italic">
+                      Chưa có cuộc gọi nào.
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <ChartContainer config={outcomeChartConfig} className="h-[270px] w-full">
+                        <PieChart>
+                          <ChartTooltip
+                            cursor={false}
+                            content={
+                              <ChartTooltipContent
+                                nameKey="key"
+                                className="bg-white border-slate-200 shadow-lg rounded-xl text-slate-800"
+                              />
+                            }
+                          />
+                          <Pie
+                            data={data.callOutcomes}
+                            dataKey="count"
+                            nameKey="key"
+                            innerRadius={60}
+                            outerRadius={88}
+                            paddingAngle={3}
+                          >
+                            {data.callOutcomes.map((entry) => (
+                              <Cell
+                                key={entry.key}
+                                fill={OUTCOME_COLORS[entry.key] || '#94a3b8'}
+                              />
+                            ))}
+                          </Pie>
+                          <ChartLegend
+                            content={
+                              <ChartLegendContent
+                                nameKey="key"
+                                className="flex-wrap gap-x-3 gap-y-1 text-[11px]"
+                              />
+                            }
+                          />
+                        </PieChart>
+                      </ChartContainer>
+                      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-9">
+                        <span className="text-2xl font-black text-slate-900">
+                          {data.kpis.totalCalls}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-600">
+                          {data.kpis.answeredRate}% Nghe máy
+                        </span>
                       </div>
                     </div>
-                    <span
-                      className={`text-xs font-bold ${
-                        isCurrent ? 'text-sky-600 font-black' : 'text-slate-400'
-                      }`}
-                    >
-                      {item.month}
-                    </span>
-                  </div>
-                );
-              })}
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
 
-        {/* 3. BANNER CHUYỂN NHANH SANG QUẢN TRỊ NHÂN SỰ */}
-        <div className="p-4 rounded-2xl bg-[#F5F2EB] border border-[#E8E1D5] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-bold text-slate-800">
-              Quản lý danh sách nhân viên và phân bổ tiền tố Leads?
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Thêm nhân viên mới, phân quyền truy cập và kiểm soát trạng thái tài khoản.
-            </div>
-          </div>
+            {/* HÀNG 3: HIỆU SUẤT SALES (7 CỘT) & LÝ DO LOST (5 CỘT) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <Card className="lg:col-span-7 rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black text-slate-900">
+                    Hiệu Suất Sales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {data.salesPerformance.length === 0 ? (
+                    <div className="h-[230px] flex items-center justify-center text-xs text-slate-400 italic">
+                      Chưa có Sales hoạt động.
+                    </div>
+                  ) : (
+                    <>
+                      <ChartContainer config={salesChartConfig} className="h-[210px] w-full">
+                        <BarChart
+                          data={data.salesPerformance}
+                          margin={{ top: 10, right: 12, left: 0, bottom: 4 }}
+                        >
+                          <CartesianGrid vertical={false} stroke="#f1f5f9" />
+                          <XAxis
+                            dataKey="displayLabel"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11, fill: '#64748b' }}
+                          />
+                          <ChartTooltip
+                            cursor={{ fill: 'rgba(14, 165, 233, 0.08)' }}
+                            content={
+                              <ChartTooltipContent className="bg-white border-slate-200 shadow-lg rounded-xl text-slate-800" />
+                            }
+                          />
+                          <ChartLegend content={<ChartLegendContent />} />
+                          <Bar
+                            dataKey="calls"
+                            fill="var(--color-calls)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={42}
+                          />
+                          <Bar
+                            dataKey="wonCount"
+                            fill="var(--color-wonCount)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={42}
+                          />
+                        </BarChart>
+                      </ChartContainer>
 
-          <button
-            type="button"
-            onClick={() => navigate('/users')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
-          >
-            <span>Chuyển Sang Quản Trị Nhân Viên</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                        {data.salesPerformance.map((s) => (
+                          <div
+                            key={s.salesId}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-50 border border-slate-200/80 text-xs"
+                          >
+                            <span className="font-bold text-slate-800">{s.displayLabel}</span>
+                            <span className="font-mono font-bold text-emerald-700">
+                              ${s.wonRevenue.toLocaleString()}
+                            </span>
+                            {s.overdueCount > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="bg-rose-50 text-rose-600 border-rose-200 text-[10px] px-1.5 py-0"
+                              >
+                                {s.overdueCount} quá hạn
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-5 rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black text-slate-900">
+                    Lý Do Mất Khách (Lost)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {data.lostReasons.length === 0 ? (
+                    <div className="h-[250px] flex items-center justify-center text-xs text-slate-400 italic">
+                      Chưa có đơn Lost nào.
+                    </div>
+                  ) : (
+                    <ChartContainer config={lostChartConfig} className="h-[250px] w-full">
+                      <BarChart
+                        data={data.lostReasons}
+                        layout="vertical"
+                        margin={{ top: 4, right: 28, left: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                        <XAxis type="number" hide allowDecimals={false} />
+                        <YAxis
+                          dataKey="reason"
+                          type="category"
+                          tickLine={false}
+                          axisLine={false}
+                          width={165}
+                          tick={{ fontSize: 11, fontWeight: 600, fill: '#475569' }}
+                        />
+                        <ChartTooltip
+                          cursor={{ fill: 'rgba(244, 63, 94, 0.08)' }}
+                          content={
+                            <ChartTooltipContent className="bg-white border-slate-200 shadow-lg rounded-xl text-slate-800" />
+                          }
+                        />
+                        <Bar dataKey="count" fill="#f43f5e" radius={[0, 8, 8, 0]} barSize={22}>
+                          <LabelList
+                            dataKey="count"
+                            position="right"
+                            style={{ fontSize: 11, fontWeight: 700, fill: '#e11d48' }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* HÀNG 4: ACTION QUEUE */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <UserX className="w-4 h-4 text-amber-600" />
+                    <span>Chưa Phân Công</span>
+                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                      {data.kpis.unassignedCount}
+                    </Badge>
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => navigate('/leads')}
+                    className="rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold gap-1 shrink-0"
+                  >
+                    <span>Phân bổ</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {data.actionQueue.unassignedQueue.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 italic">
+                      Đã phân công hết Lead.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {data.actionQueue.unassignedQueue.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => navigate('/leads')}
+                          className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                {item.leadCustomId}
+                              </span>
+                              <span className="text-xs font-bold text-slate-800 truncate">
+                                {item.restaurantName}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              Bang {item.state} • {item.hotline}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 shrink-0">
+                            {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-slate-200/80 shadow-xs bg-white">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-rose-600" />
+                    <span>Lead Hot Bị Bỏ Quên</span>
+                    <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200">
+                      {data.actionQueue.neglectedHotLeads.length}
+                    </Badge>
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/leads')}
+                    className="rounded-xl border-slate-200 text-xs font-bold gap-1 shrink-0"
+                  >
+                    <span>Xem bảng</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {data.actionQueue.neglectedHotLeads.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 italic">
+                      Không có Lead Hot nào bị bỏ quên.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {data.actionQueue.neglectedHotLeads.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => navigate('/leads')}
+                          className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 px-2 rounded-xl cursor-pointer transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                {item.leadCustomId}
+                              </span>
+                              <span className="text-xs font-bold text-slate-800 truncate">
+                                {item.restaurantName}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  item.status === 'HOT_LEAD'
+                                    ? 'bg-rose-50 text-rose-600 border-rose-200 text-[10px] px-1.5 py-0'
+                                    : 'bg-indigo-50 text-indigo-600 border-indigo-200 text-[10px] px-1.5 py-0'
+                                }
+                              >
+                                {item.status === 'HOT_LEAD' ? 'Hot' : 'High Interest'}
+                              </Badge>
+                            </div>
+                            <span className="text-[11px] text-slate-500">
+                              Phụ trách: <strong>{item.assignedName}</strong>
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-rose-600 font-semibold shrink-0">
+                            {item.nextCallDate ? `Hẹn: ${item.nextCallDate}` : 'Chưa đặt lịch'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        ) : null}
       </main>
-    </>
+    </div>
   );
 };
-
-export default AdminDashboardPage;

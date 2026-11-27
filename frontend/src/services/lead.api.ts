@@ -14,6 +14,9 @@ import {
   CreateLeadInput,
   CreateLeadNoteInput,
   ImportLeadsResult,
+  DashboardPeriod,
+  AdminDashboardResponse,
+  SalesDashboardResponse,
   UpdateLeadInput,
   GetLeadsParams,
   GetLeadsResponse,
@@ -198,5 +201,33 @@ export const leadApi = {
       message: res.data.message || 'Import thành công!',
       result: res.data.data,
     };
+  },
+
+  /**
+   * 14. LẤY DỮ LIỆU THỐNG KÊ THẬT CHO ADMIN DASHBOARD
+   * GET /api/leads/admin-dashboard
+   */
+  getAdminDashboard: async (
+    period: DashboardPeriod,
+    todayDate: string
+  ): Promise<AdminDashboardResponse> => {
+    const res = await api.get('/leads/admin-dashboard', {
+      params: { period, todayDate },
+    });
+    return res.data.data;
+  },
+
+  /**
+   * 15. LẤY DỮ LIỆU THỐNG KÊ THẬT CHO SALES DASHBOARD
+   * GET /api/leads/sales-dashboard
+   */
+  getSalesDashboard: async (
+    period: DashboardPeriod,
+    todayDate: string
+  ): Promise<SalesDashboardResponse> => {
+    const res = await api.get('/leads/sales-dashboard', {
+      params: { period, todayDate },
+    });
+    return res.data.data;
   },
 };

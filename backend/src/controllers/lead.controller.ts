@@ -317,4 +317,53 @@ export class LeadController {
       });
     }
   }
+
+  /**
+   * 12. THỐNG KÊ ADMIN DASHBOARD (GET /api/leads/admin-dashboard)
+   */
+  async getAdminDashboard(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+      const rawPeriod = String(req.query.period || '30d');
+      const period = (['today', '7d', '30d', 'all'].includes(rawPeriod)
+        ? rawPeriod
+        : '30d') as 'today' | '7d' | '30d' | 'all';
+      const todayDate = String(req.query.todayDate || '');
+
+      const data = await leadService.getAdminDashboard(period, todayDate, req.user);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      const statusCode = err.message?.includes('quyền') ? 403 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Tải dữ liệu Admin Dashboard thất bại!',
+      });
+    }
+  }
+
+  /**
+   * 13. THỐNG KÊ SALES DASHBOARD (GET /api/leads/sales-dashboard)
+   */
+  async getSalesDashboard(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập lại!' });
+      }
+      const rawPeriod = String(req.query.period || '7d');
+      const period = (['today', '7d', '30d', 'all'].includes(rawPeriod)
+        ? rawPeriod
+        : '7d') as 'today' | '7d' | '30d' | 'all';
+      const todayDate = String(req.query.todayDate || '');
+
+      const data = await leadService.getSalesDashboard(period, todayDate, req.user);
+      return res.status(200).json({ success: true, data });
+    } catch (err: any) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Tải dữ liệu Sales Dashboard thất bại!',
+      });
+    }
+  }
 }

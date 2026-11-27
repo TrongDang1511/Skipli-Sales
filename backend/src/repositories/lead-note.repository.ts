@@ -36,6 +36,14 @@ export class LeadNoteRepository {
   }
 
   /**
+   * 1.1 LẤY TOÀN BỘ LỊCH SỬ CUỘC GỌI (PHỤC VỤ THỐNG KÊ DASHBOARD ADMIN)
+   */
+  async findAll(): Promise<LeadNote[]> {
+    const snapshot = await this.getDb().collection(this.collectionName).get();
+    return snapshot.docs.map((doc) => doc.data() as LeadNote);
+  }
+
+  /**
    * 2. LƯU GHI CHÚ MỚI VÀO FIRESTORE
    */
   async create(note: LeadNote): Promise<LeadNote> {
