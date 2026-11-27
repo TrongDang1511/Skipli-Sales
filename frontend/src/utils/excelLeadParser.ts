@@ -8,7 +8,8 @@
  */
 
 import * as XLSX from 'xlsx';
-import { CreateLeadInput } from '../types/lead.types';
+import { CreateLeadInput, Lead, LEAD_STATUS_CONFIG } from '../types/lead.types';
+import { getLocalDateString } from '../lib/utils';
 
 export interface ParsedExcelRow {
   rowNumber: number;
@@ -108,4 +109,56 @@ export function downloadLeadImportTemplate(): void {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leads_Template');
   XLSX.writeFile(wb, 'Skipli_Leads_Import_Template.xlsx');
+}
+
+/**
+ * Xuất danh sách Lead hiện tại ra file Excel (.xlsx) với 18 cột chuẩn tiếng Việt
+ */
+export function exportLeadsToExcel(leads: Lead[], fileNamePrefix = 'Skipli_Leads'): void {
+  const rows = leads.map((lead, idx) => ({
+    STT: idx + 1,
+    'Mã Lead': lead.leadCustomId,
+    'Tên Nhà Hàng': lead.restaurantName,
+    Bang: lead.state,
+    'Thành Phố': lead.city || '',
+    'Địa Chỉ': lead.address || '',
+    Hotline: lead.hotline,
+    'Chủ Quán': lead.ownerName || '',
+    'SĐT Chủ Quán': lead.ownerPhone || '',
+    Email: lead.ownerEmail || '',
+    'Trạng Thái': LEAD_STATUS_CONFIG[lead.status]?.label || lead.status,
+    'Phụ Trách': lead.assignedName || 'Chưa phân công',
+    'Số Cuộc Gọi': lead.callCount ?? 0,
+    'Hẹn Gọi Lại': lead.nextCallDate || '',
+    'Gọi Gần Nhất': lead.lastCallDate || '',
+    'Doanh Thu Deal ($)': lead.dealValue ?? 0,
+    'Lý Do Lost': lead.lostReason || '',
+    'Ghi Chú Mới Nhất': lead.latestNote || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 12 },
+    { wch: 28 },
+    { wch: 8 },
+    { wch: 16 },
+    { wch: 26 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 24 },
+    { wch: 15 },
+    { wch: 20 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 26 },
+    { wch: 36 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+  XLSX.writeFile(wb, `${fileNamePrefix}_${getLocalDateString()}.xlsx`);
 }

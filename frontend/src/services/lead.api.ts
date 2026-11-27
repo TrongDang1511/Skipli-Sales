@@ -230,4 +230,27 @@ export const leadApi = {
     });
     return res.data.data;
   },
+
+  /**
+   * 16. LẤY TOÀN BỘ LEADS KHỚP BỘ LỌC ĐỂ XUẤT EXCEL (GOM TRANG LIMIT=100 SONG SONG)
+   */
+  getAllLeadsForExport: async (
+    params?: Omit<GetLeadsParams, 'page' | 'limit'>
+  ): Promise<Lead[]> => {
+    const firstPage = await leadApi.getLeads({ ...params, page: 1, limit: 100 });
+    const allItems: Lead[] = [...(firstPage.items || [])];
+
+    if (firstPage.totalPages > 1) {
+      const restPages = await Promise.all(
+        Array.from({ length: firstPage.totalPages - 1 }, (_, idx) =>
+          leadApi.getLeads({ ...params, page: idx + 2, limit: 100 })
+        )
+      );
+      restPages.forEach((pageRes) => {
+        allItems.push(...(pageRes.items || []));
+      });
+    }
+
+    return allItems;
+  },
 };

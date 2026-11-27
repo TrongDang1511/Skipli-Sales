@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import { authApi, UserProfile } from '../../services/auth.api';
@@ -35,6 +36,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { AdminAssignDropdown } from './AdminAssignDropdown';
 import { LeadDetailModal } from './LeadDetailModal';
 import { LeadEditModal } from './LeadEditModal';
+import { exportLeadsToExcel } from '../../utils/excelLeadParser';
 
 interface AdminLeadDataTableProps {
   onOpenAddModal?: () => void;
@@ -68,6 +70,7 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
   const limit = 25;
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // State danh sách nhân viên Sales để phân bổ
   const [salesList, setSalesList] = useState<UserProfile[]>([]);
@@ -121,6 +124,16 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
     return () => clearTimeout(timer);
   }, [searchKeyword]);
 
+  const buildFilterParams = useCallback(
+    () => ({
+      status: statusFilter !== 'ALL' ? (statusFilter as any) : undefined,
+      state: stateFilter !== 'ALL' ? stateFilter : undefined,
+      search: debouncedSearch || undefined,
+      assignedTo: salesFilter !== 'ALL' ? salesFilter : undefined,
+    }),
+    [statusFilter, stateFilter, debouncedSearch, salesFilter]
+  );
+
   // Tải dữ liệu Leads toàn công ty
   const fetchLeads = useCallback(async () => {
     setIsLoading(true);
@@ -128,10 +141,7 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
       const res = await leadApi.getLeads({
         page,
         limit,
-        status: statusFilter !== 'ALL' ? (statusFilter as any) : undefined,
-        state: stateFilter !== 'ALL' ? stateFilter : undefined,
-        search: debouncedSearch || undefined,
-        assignedTo: salesFilter !== 'ALL' ? salesFilter : undefined,
+        ...buildFilterParams(),
       });
 
       setLeads(res.items || []);
@@ -142,7 +152,25 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [page, statusFilter, stateFilter, debouncedSearch, salesFilter]);
+  }, [page, buildFilterParams]);
+
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const items = await leadApi.getAllLeadsForExport(buildFilterParams());
+      if (items.length === 0) {
+        toast.error('Không có nhà hàng nào khớp bộ lọc để xuất Excel!');
+        return;
+      }
+      exportLeadsToExcel(items, 'Skipli_Admin_Leads');
+      toast.success(`Đã xuất ${items.length} nhà hàng ra file Excel!`);
+    } catch (err: any) {
+      toast.error(extractApiErrorMessage(err, 'Xuất file Excel thất bại!'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     fetchLeads();
@@ -312,6 +340,22 @@ export const AdminLeadDataTable: React.FC<AdminLeadDataTableProps> = ({
             title="Tải lại danh sách và đồng bộ chỉ số KPI"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
+          </button>
+
+          {/* Nút Export Excel */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 disabled:opacity-50 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Xuất toàn bộ danh sách khớp bộ lọc hiện tại ra file Excel"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+            ) : (
+              <Download className="w-4 h-4 text-sky-600" />
+            )}
+            <span>Export Excel</span>
           </button>
 
           {/* Nút Import Excel */}

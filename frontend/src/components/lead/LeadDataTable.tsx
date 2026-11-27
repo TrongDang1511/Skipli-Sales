@@ -29,6 +29,7 @@ import {
   Share2,
   MapPin,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import { leadApi, extractApiErrorMessage } from '../../services/lead.api';
 import {
@@ -51,6 +52,7 @@ import { LostReasonModal } from './LostReasonModal';
 import { LeadDetailModal } from './LeadDetailModal';
 import { LeadEditModal } from './LeadEditModal';
 import { getLocalDateString } from '@/lib/utils';
+import { exportLeadsToExcel } from '../../utils/excelLeadParser';
 
 interface LeadDataTableProps {
   onOpenAddModal?: () => void;
@@ -122,6 +124,9 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
   // State copy số điện thoại
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // State đang xuất Excel
+  const [isExporting, setIsExporting] = useState(false);
+
   // Debounce tìm kiếm 300ms
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -138,28 +143,35 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Build params bộ lọc hiện tại (dùng chung cho fetchLeads và Export Excel)
+  const buildFilterParams = useCallback((): Omit<GetLeadsParams, 'page' | 'limit'> => {
+    const params: Omit<GetLeadsParams, 'page' | 'limit'> = {
+      sheet: activeSheet,
+      todayDate: today,
+    };
+
+    if (debouncedSearch) {
+      params.search = debouncedSearch;
+    }
+    if (stateFilter !== 'ALL') {
+      params.state = stateFilter;
+    }
+    if (scheduleFilter !== 'ALL') {
+      params.schedule = scheduleFilter;
+    }
+
+    return params;
+  }, [activeSheet, debouncedSearch, scheduleFilter, stateFilter, today]);
+
   // Lấy dữ liệu từ API theo Sheet & bộ lọc hiện tại
   const fetchLeads = useCallback(async () => {
     setIsLoading(true);
     try {
-      const params: GetLeadsParams = {
+      const res = await leadApi.getLeads({
         page,
         limit,
-        sheet: activeSheet,
-        todayDate: today,
-      };
-
-      if (debouncedSearch) {
-        params.search = debouncedSearch;
-      }
-      if (stateFilter !== 'ALL') {
-        params.state = stateFilter;
-      }
-      if (scheduleFilter !== 'ALL') {
-        params.schedule = scheduleFilter;
-      }
-
-      const res = await leadApi.getLeads(params);
+        ...buildFilterParams(),
+      });
       const loadedItems = res.items || [];
       setLeads(loadedItems);
       onLeadsLoaded?.(loadedItems);
@@ -174,7 +186,27 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, activeSheet, debouncedSearch, scheduleFilter, stateFilter, today]);
+  }, [page, limit, buildFilterParams]);
+
+  // Xuất toàn bộ leads theo bộ lọc hiện tại ra file Excel (.xlsx)
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const items = await leadApi.getAllLeadsForExport(buildFilterParams());
+      if (items.length === 0) {
+        toast.info('Không có dữ liệu phù hợp bộ lọc để xuất Excel!');
+        return;
+      }
+      exportLeadsToExcel(items, 'Skipli_Sales_Leads');
+      toast.success(`Đã xuất thành công ${items.length} nhà hàng ra file Excel!`);
+    } catch (err: any) {
+      console.error('Lỗi xuất Excel:', err);
+      toast.error(extractApiErrorMessage(err, 'Xuất file Excel thất bại!'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Kích hoạt fetch khi dependencies hoặc refreshTrigger thay đổi
   useEffect(() => {
@@ -457,6 +489,22 @@ export const LeadDataTable: React.FC<LeadDataTableProps> = ({
             title="Tải lại danh sách và cập nhật chỉ số"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-sky-600' : ''}`} />
+          </button>
+
+          {/* Nút Export Excel */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-700 disabled:opacity-50 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Xuất toàn bộ danh sách khớp bộ lọc hiện tại ra file Excel"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+            ) : (
+              <Download className="w-4 h-4 text-sky-600" />
+            )}
+            <span>Export Excel</span>
           </button>
 
           {/* Nút Import Excel */}
