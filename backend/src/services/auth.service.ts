@@ -20,6 +20,8 @@ import {
   UserResponseDto,
 } from '../dtos';
 
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // Hiệu lực link đặt lại mật khẩu: 15 phút
+
 export class AuthService {
   private userRepo: UserRepository;
   private emailService: EmailService;
@@ -368,5 +370,63 @@ export class AuthService {
       throw new Error('Tài khoản người dùng không tồn tại hoặc đã bị khóa!');
     }
     return this.sanitizeUser(user);
+  }
+
+  private hashResetToken(rawToken: string): string {
+    return crypto.createHash('sha256').update(rawToken).digest('hex');
+  }
+
+  /**
+   * 7. QUÊN MẬT KHẨU - SINH TOKEN NGẮN HẠN (15 PHÚT) & GỬI EMAIL
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const genericMessage =
+      'Nếu email tồn tại và đã kích hoạt trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi tới hộp thư của bạn.';
+
+    const user = await this.userRepo.findByEmail(email);
+    // Chống dò email (User Enumeration Defense): không báo lỗi nếu email không tồn tại hoặc chưa kích hoạt
+    if (!user || !user.isActive) {
+      return { message: genericMessage };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordTokenHash = this.hashResetToken(rawToken);
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString();
+    user.updatedAt = new Date().toISOString();
+    await this.userRepo.save(user);
+
+    const resetUrl = `${env.frontendUrl}/reset-password?token=${rawToken}`;
+    await this.emailService.sendResetPasswordEmail(user.email, user.fullName, resetUrl);
+
+    return { message: genericMessage };
+  }
+
+  /**
+   * 8. ĐẶT LẠI MẬT KHẨU MỚI - XÁC THỰC TOKEN & HỦY PHIÊN CŨ
+   */
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const tokenHash = this.hashResetToken(token.trim());
+    const user = await this.userRepo.findByResetPasswordTokenHash(tokenHash);
+
+    if (!user || !user.isActive) {
+      throw new Error('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã được sử dụng!');
+    }
+
+    if (!user.resetPasswordExpiresAt || new Date(user.resetPasswordExpiresAt) <= new Date()) {
+      throw new Error('Liên kết đặt lại mật khẩu đã hết hạn (quá 15 phút). Vui lòng gửi lại yêu cầu mới!');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordTokenHash = null;
+    user.resetPasswordExpiresAt = null;
+    user.refreshTokenHash = null;
+    user.previousRefreshTokenHash = null;
+    user.previousRefreshTokenExpiresAt = null;
+    user.updatedAt = new Date().toISOString();
+    await this.userRepo.save(user);
+
+    return {
+      message: 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.',
+    };
   }
 }

@@ -19,6 +19,8 @@ export interface User {
   isActive: boolean;               // Trạng thái tài khoản (true = đã kích hoạt, false = chờ kích hoạt)
   activationToken?: string | null; // Mã token kích hoạt tài khoản gửi qua email (hạn 24h)
   activationExpiresAt?: string | null; // Thời điểm hết hạn của token kích hoạt (ISO Timestamp)
+  resetPasswordTokenHash?: string | null; // SHA-256 hash của token đặt lại mật khẩu (dùng 1 lần)
+  resetPasswordExpiresAt?: string | null; // Thời điểm hết hạn của token đặt lại mật khẩu (15 phút)
   refreshTokenHash?: string | null;// Hash của Refresh Token lưu trữ để đối soát phiên đăng nhập
   previousRefreshTokenHash?: string | null;      // Hash của token cũ vừa xoay vòng (Grace Period chống race condition)
   previousRefreshTokenExpiresAt?: string | null; // Hạn chót của thời gian ân hạn Grace Period (20s)

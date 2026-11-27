@@ -23,59 +23,52 @@ export class UserRepository {
   }
 
   /**
-   * 1. Tìm User theo Email (chuẩn hóa chữ thường, chống trùng)
+   * Helper truy vấn 1 User theo field bất kỳ (tránh lặp boilerplate Firestore)
    */
-  async findByEmail(email: string): Promise<User | null> {
+  private async findOneByField(field: keyof User, value: string): Promise<User | null> {
     const snapshot = await this.getDb()
       .collection(this.collectionName)
-      .where('email', '==', email.toLowerCase().trim())
+      .where(field, '==', value)
       .limit(1)
       .get();
 
     if (snapshot.empty) return null;
     return snapshot.docs[0].data() as User;
+  }
+
+  /**
+   * 1. Tìm User theo Email (chuẩn hóa chữ thường, chống trùng)
+   */
+  async findByEmail(email: string): Promise<User | null> {
+    return this.findOneByField('email', email.toLowerCase().trim());
   }
 
   /**
    * 2. Tìm User theo Token Kích Hoạt (khi Sales click vào link từ email)
    */
   async findByActivationToken(token: string): Promise<User | null> {
-    const snapshot = await this.getDb()
-      .collection(this.collectionName)
-      .where('activationToken', '==', token)
-      .limit(1)
-      .get();
+    return this.findOneByField('activationToken', token);
+  }
 
-    if (snapshot.empty) return null;
-    return snapshot.docs[0].data() as User;
+  /**
+   * 2.1 Tìm User theo Hash của Token Đặt Lại Mật Khẩu
+   */
+  async findByResetPasswordTokenHash(tokenHash: string): Promise<User | null> {
+    return this.findOneByField('resetPasswordTokenHash', tokenHash);
   }
 
   /**
    * 3. Tìm User theo Sales Prefix (đảm bảo mỗi bạn Sales có tiền tố duy nhất, tránh trùng mã Lead)
    */
   async findBySalesPrefix(prefix: string): Promise<User | null> {
-    const snapshot = await this.getDb()
-      .collection(this.collectionName)
-      .where('salesPrefix', '==', prefix.toUpperCase().trim())
-      .limit(1)
-      .get();
-
-    if (snapshot.empty) return null;
-    return snapshot.docs[0].data() as User;
+    return this.findOneByField('salesPrefix', prefix.toUpperCase().trim());
   }
 
   /**
    * 4. Tìm User theo Username (đảm bảo không trùng tên đăng nhập khi kích hoạt)
    */
   async findByUsername(username: string): Promise<User | null> {
-    const snapshot = await this.getDb()
-      .collection(this.collectionName)
-      .where('username', '==', username.toLowerCase().trim())
-      .limit(1)
-      .get();
-
-    if (snapshot.empty) return null;
-    return snapshot.docs[0].data() as User;
+    return this.findOneByField('username', username.toLowerCase().trim());
   }
 
   /**

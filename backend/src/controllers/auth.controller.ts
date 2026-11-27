@@ -8,7 +8,14 @@
 
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
-import { LoginRequestSchema, ActivateUserRequestSchema, ApiResponse, AuthResponseDto } from '../dtos';
+import {
+  LoginRequestSchema,
+  ActivateUserRequestSchema,
+  ForgotPasswordRequestSchema,
+  ResetPasswordRequestSchema,
+  ApiResponse,
+  AuthResponseDto,
+} from '../dtos';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { env } from '../config/env.config';
 
@@ -33,6 +40,10 @@ function getClearCookieOptions() {
     secure: env.isProduction,
     sameSite: (env.isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
   };
+}
+
+function extractControllerErrorMessage(err: any, fallback: string): string {
+  return err?.issues?.[0]?.message || err?.message || fallback;
 }
 
 export class AuthController {
@@ -177,6 +188,44 @@ export class AuthController {
       return res.status(401).json({
         success: false,
         message: err.message || 'Không thể lấy thông tin người dùng!',
+      });
+    }
+  }
+
+  /**
+   * 6. QUÊN MẬT KHẨU (POST /api/auth/forgot-password)
+   */
+  async forgotPassword(req: Request, res: Response) {
+    try {
+      const validated = ForgotPasswordRequestSchema.parse(req.body);
+      const result = await authService.forgotPassword(validated.email);
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        success: false,
+        message: extractControllerErrorMessage(err, 'Không thể gửi yêu cầu đặt lại mật khẩu!'),
+      });
+    }
+  }
+
+  /**
+   * 7. ĐẶT LẠI MẬT KHẨU MỚI (POST /api/auth/reset-password)
+   */
+  async resetPassword(req: Request, res: Response) {
+    try {
+      const validated = ResetPasswordRequestSchema.parse(req.body);
+      const result = await authService.resetPassword(validated.token, validated.password);
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        success: false,
+        message: extractControllerErrorMessage(err, 'Đặt lại mật khẩu thất bại!'),
       });
     }
   }

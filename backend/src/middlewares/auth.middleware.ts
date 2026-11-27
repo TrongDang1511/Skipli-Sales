@@ -69,32 +69,42 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
   return next();
 }
 
+function createRateLimiter(windowMs: number, max: number, message: string) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message },
+  });
+}
+
 /**
  * 3. RATE LIMITER: CHỐNG TẤN CÔNG DÒ MẬT KHẨU (BRUTE-FORCE DEFENSE)
  * Tối đa 5 lần thử đăng nhập sai trong vòng 15 phút cho mỗi địa chỉ IP
  */
-export const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Bạn đã thử đăng nhập thất bại quá nhiều lần. Để bảo vệ tài khoản, vui lòng thử lại sau 15 phút!',
-  },
-});
+export const loginRateLimiter = createRateLimiter(
+  15 * 60 * 1000,
+  5,
+  'Bạn đã thử đăng nhập thất bại quá nhiều lần. Để bảo vệ tài khoản, vui lòng thử lại sau 15 phút!'
+);
 
 /**
  * 4. RATE LIMITER: CHỐNG SPAM EMAIL BREVO (SPAM DEFENSE)
  * Tối đa 15 lượt mời nhân viên trong vòng 1 giờ cho mỗi địa chỉ IP
  */
-export const inviteRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 giờ
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Bạn đã thực hiện quá nhiều yêu cầu gửi email mời nhân viên. Vui lòng thử lại sau 1 giờ!',
-  },
-});
+export const inviteRateLimiter = createRateLimiter(
+  60 * 60 * 1000,
+  15,
+  'Bạn đã thực hiện quá nhiều yêu cầu gửi email mời nhân viên. Vui lòng thử lại sau 1 giờ!'
+);
+
+/**
+ * 5. RATE LIMITER: CHỐNG SPAM EMAIL QUÊN MẬT KHẨU
+ * Tối đa 5 yêu cầu trong vòng 15 phút cho mỗi địa chỉ IP
+ */
+export const forgotPasswordRateLimiter = createRateLimiter(
+  15 * 60 * 1000,
+  5,
+  'Bạn đã gửi quá nhiều yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau 15 phút!'
+);

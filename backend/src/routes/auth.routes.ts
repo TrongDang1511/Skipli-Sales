@@ -8,7 +8,7 @@
 
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
-import { requireAuth, loginRateLimiter } from '../middlewares/auth.middleware';
+import { requireAuth, loginRateLimiter, forgotPasswordRateLimiter } from '../middlewares/auth.middleware';
 
 const router = Router();
 const authController = new AuthController();
@@ -27,5 +27,13 @@ router.get('/me', requireAuth, (req, res) => authController.getMe(req, res));
 
 // 5. Đăng xuất an toàn (Hủy refresh token trong DB và xóa Cookie)
 router.post('/logout', requireAuth, (req, res) => authController.logout(req, res));
+
+// 6. Quên mật khẩu (Public + Rate Limit chống spam email)
+router.post('/forgot-password', forgotPasswordRateLimiter, (req, res) =>
+  authController.forgotPassword(req, res)
+);
+
+// 7. Đặt lại mật khẩu mới từ link email (Public)
+router.post('/reset-password', (req, res) => authController.resetPassword(req, res));
 
 export default router;
