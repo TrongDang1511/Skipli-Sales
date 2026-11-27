@@ -12,19 +12,13 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
-  Video,
-  Headphones,
-  FileText,
-  ChevronRight,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../contexts/ToastContext';
 import { leadApi } from '../../services/lead.api';
 
 export const SalesLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -140,53 +134,6 @@ export const SalesLayout: React.FC = () => {
                 >
                   {leadsCount} leads
                 </span>
-              </button>
-
-              {/* Lịch Hẹn Demo */}
-              <button
-                type="button"
-                onClick={() =>
-                  toast.info('Phân hệ Lịch Hẹn Demo qua Google Meet/Zoom đang được hoàn thiện!')
-                }
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <Video className="w-4 h-4 text-slate-400" />
-                  <span>Lịch Hẹn Demo</span>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  4 hôm nay
-                </span>
-              </button>
-
-              {/* Cuộc Gọi AI Bot Cold-Calling */}
-              <button
-                type="button"
-                onClick={() =>
-                  toast.info('Phân hệ Cuộc Gọi AI Bot tự động tiếp cận đang được kết nối với Twilio/Vapi!')
-                }
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <Headphones className="w-4 h-4 text-slate-400" />
-                  <span>Cuộc Gọi AI Bot</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              </button>
-
-              {/* Hợp Đồng & Hoa Hồng */}
-              <button
-                type="button"
-                onClick={() =>
-                  toast.info('Phân hệ Quản Lý Hoa Hồng & Hợp Đồng Deals đang được cấu hình!')
-                }
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-slate-400" />
-                  <span>Hoa Hồng & Deals</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
               </button>
             </div>
           </nav>

@@ -3,21 +3,14 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  PhoneCall,
-  ChevronRight,
   LogOut,
   Building2,
-  UserCheck,
-  FileText,
-  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../contexts/ToastContext';
 import { authApi } from '../../services/auth.api';
 
 export const AdminLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -133,22 +126,6 @@ export const AdminLayout: React.FC = () => {
                 </span>
               </button>
 
-              {/* Đội Ngũ Sales */}
-              <button
-                type="button"
-                onClick={() => {
-                  navigate('/users');
-                  toast.success('Đang hiển thị danh sách đội ngũ chuyên viên Sales.');
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <UserCheck className="w-4 h-4 text-slate-400" />
-                  <span>Đội Ngũ Sales</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              </button>
-
               {/* Leads Nhà Hàng (Route /leads) */}
               <button
                 type="button"
@@ -174,55 +151,6 @@ export const AdminLayout: React.FC = () => {
                 >
                   Leads CRM
                 </span>
-              </button>
-
-              {/* Cuộc Gọi AI & Demo */}
-              <button
-                type="button"
-                onClick={() => {
-                  toast.success('Phân hệ Cuộc Gọi AI & Lịch Hẹn Demo: 1,248 cuộc gọi đã hoàn tất.');
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <PhoneCall className="w-4 h-4 text-slate-400" />
-                  <span>Cuộc Gọi AI & Demo</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              </button>
-
-              {/* Hợp Đồng / Deals */}
-              <button
-                type="button"
-                onClick={() => {
-                  toast.success('Phân hệ Hợp Đồng / Deals: Tổng giá trị $42,850/tháng.');
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-slate-400" />
-                  <span>Hợp Đồng / Deals</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-              </button>
-            </div>
-
-            {/* NHÓM 3: HỆ THỐNG */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                HỆ THỐNG
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  toast.success('Phân hệ Cài đặt & Bảo mật hệ thống đang hoạt động tối ưu.')
-                }
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <Settings className="w-4 h-4 text-slate-400" />
-                  <span>Cài Đặt & Bảo Mật</span>
-                </div>
               </button>
             </div>
           </nav>
